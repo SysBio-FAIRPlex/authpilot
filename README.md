@@ -1,1 +1,1 @@
-# authpilot
+# SysBio FAIRplex GA4GH Auth Pilot
