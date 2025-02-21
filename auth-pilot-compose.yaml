@@ -155,7 +155,7 @@ services:
     environment:
       - DSN=sqlite:///var/lib/sqlite/db.sqlite?_fk=true
       - LOG_LEVEL=trace
-    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+    command: serve -c /etc/config/kratos/kratos-fairplex.yml --dev --watch-courier
     volumes:
       - type: volume
         source: kratos-sqlite

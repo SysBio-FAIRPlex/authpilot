@@ -47,7 +47,7 @@ selfservice:
                   essential: true
                 family_name: null
                 hd: null
-                enabled: true
+        enabled: true
 
   flows:
     error:
