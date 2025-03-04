@@ -1,7 +1,7 @@
 # SysBio FAIRplex GA4GH Auth Pilot
 
 ```
-docker-compose -f auth-pilot-compose.yml up --force-recreate -d
+docker-compose -f auth-pilot-compose.yaml up --force-recreate -d
 ```
 
 ## Notes

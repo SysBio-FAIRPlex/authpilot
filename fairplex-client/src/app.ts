@@ -6,6 +6,7 @@ import cookieParser from 'cookie-parser';
 import jwt, { JsonWebTokenError } from 'jsonwebtoken';
 import jwkToPem from 'jwk-to-pem';
 import bodyParser from 'body-parser';
+import path from 'path';
 
 // Extend express-session declarations
 declare module 'express-session' {
@@ -28,6 +29,8 @@ declare module 'express-session' {
     sourceAmpPdDRSUrl? : string;
     ampPdDataTransferredTo? : string;
     ampPdDataTransferredMessage? : string;
+    listOfPDFiles? : string[];
+    listOfADFiles? : string[];
   }
 }
 
@@ -44,6 +47,10 @@ app.use(
 );
 app.use(cookieParser());
 app.use(bodyParser.urlencoded({extended:false}))
+// Serve static files from the 'public' directory
+// app.use('/public', express.static(path.join(process.cwd(), 'public')));
+app.use(express.static(path.join(process.cwd(), 'public')));
+
 
 // let server: URL = new URL('http://hydra:4444/.well-known/openid-configuration') // Authorization Server's Issuer Identifier
 let server: URL = new URL(`${process.env.HYDRA_URL}/.well-known/openid-configuration`) // Authorization Server's Issuer Identifier
@@ -68,83 +75,109 @@ app.get('/', (req: express.Request, res: express.Response) => {
   const decodedAccessToken = req.session.accessTokenDecoded || 'Not authenticated';
   const passportToken = req.session.passportToken || 'Not authenticated';
   const decodedPassportToken = req.session.passportTokenDecoded || 'Not authenticated';
+  const listOfPDFiles = req.session.listOfPDFiles || ['Not authenticated']
+  const listOfADFiles = req.session.listOfADFiles || ['Not authenticated']
   const html = `
     <!DOCTYPE html>
     <html>
       <head>
         <title>FAIRplex GA4GH Federated Authentication Pilot</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 40px; }
-          .token-display { 
-            word-break: break-all; 
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f0f0f0;
-          }
-          .label1 {
-            display: block;
-            width: 30ch;
-            background-color: light-gray;
-          }
-        </style>
+        <link rel="stylesheet" href="/styles.css">
       </head>
       <body>
-        <h1>FAIRplex GA4GH Federated Authentication Pilot</h1>
-        <button onclick="window.location.href='/login'">Login</button>
-        ${req.session.idTokenDecoded
-        ? `<div class="token-display">
-                <h3>OpenID Token:</h3>
-                <p>${idToken}</p>
-               </div>
-               <div class="token-display">
-                <h3>OpenID Token Payload:</h3>
-                <pre>${JSON.stringify(decodedIdToken, null, 2)}</pre>
-                <bold>Signature verified: ${req.session.idTokenVerified}</bold>
-              </div>
-          <div class="token-display">
-                <h3>OAuth2 Access Token:</h3>
-                <p>${accessToken}</p>
-               </div>
-               <div class="token-display">
-                <h3>OAuth2 Access Token Payload:</h3>
-                <pre>${JSON.stringify(decodedAccessToken, null, 2)}</pre>
-                <bold>Signature verified: ${req.session.accessTokenVerified}</bold>
-              </div>
-          <div class="token-display">
-                <h3>GA4GH Passport Token:</h3>
-                <p>${passportToken}</p>
-               </div>
-               <div class="token-display">
-                <h3>GA4GH Passport Payload:</h3>
-                <pre>${JSON.stringify(decodedPassportToken, null, 2)}</pre>
-                <bold>Signature verified: ${req.session.accessTokenVerified}</bold>
-              </div>
-          <br>
-          <hr>
-          <h3>AMP PD Data Transfer</h3>
-          <form action="/transfer-amp-pd-data" method="POST">
-          <label for="amp-pd-data-source" class="label1">Source DRS URI</label>
-            <input type="text" id="amp-pd-data-source" name="amp-pd-data-source" size="100" 
-              value=${req.session.sourceAmpPdDRSUrl}><br><br>
-          <label for="amp-pd-data-destination" class="label1">Destination Bucket</label>
-            <input type="text" id="amp-pd-data-destination" name="amp-pd-data-destination" size="100" 
-              value=${req.session.destinationAmpPdGCSUrl}><br><br>
-            <input type="submit" value="Transfer AMP PD Data">
-          </form>
-              `
-        : ''
-        }
-        ${req.session.ampPdDataTransferredMessage
-        ? `<div class="token-display">
-                <h4>AMP PD Data Transferred To:</h4>
-                <p>${req.session.ampPdDataTransferredTo}</p>
-                <h4>Message:</h4>
-                <p>${req.session.ampPdDataTransferredMessage}</p>
-            </div>`
-        : ''
-        }
+        <div class="container">
+          <h1>FAIRplex GA4GH Federated Authentication Pilot</h1>
+          ${req.session.listOfPDFiles
+            ? ''
+            :`<button onclick="window.location.href='/login'">Login</button>`
+          }
+          ${req.session.listOfPDFiles
+              ? `<h2>Files from AMP PD DRS Server</h2>
+                 <div class="file-list">
+                    ${listOfPDFiles.map(file => `
+                        <label class="file-item">
+                            <input type="checkbox" name="selectedFiles" value="${file}">
+                            <span class="file-name">${file}</span>
+                        </label>
+                    `).join('')}
+                 </div>
+                 <h2>Files from AMP AD DRS Server</h2>
+                 <div class="file-list">
+                    ${listOfADFiles.map(file => `
+                        <label class="file-item">
+                            <input type="checkbox" name="selectedFiles" value="${file}">
+                            <span class="file-name">${file}</span>
+                        </label>
+                    `).join('')}
+                 </div>
+                 <div class="bucket-container">
+                    <input type="text" id="gcs-bucket" class="bucket-input" placeholder="Enter GCS bucket name" value="gs://sysbio-authpilot-test-bucket">
+                    <button id="copy-button" class="copy-button">Copy to Bucket</button>
+                 </div>`
+              : ''
+          }
+          ${req.session.ampPdDataTransferredMessage
+          ? `<div class="token-display">
+                  <h4>AMP PD Data Transferred To:</h4>
+                  <p>${req.session.ampPdDataTransferredTo}</p>
+                  <h4>Message:</h4>
+                  <p>${req.session.ampPdDataTransferredMessage}</p>
+              </div>`
+          : ''
+          }
 
       </body>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const bucketInput = document.getElementById("gcs-bucket");
+            const copyButton = document.getElementById("copy-button");
+
+            copyButton.addEventListener("click", async function () {
+                const bucketName = bucketInput.value.trim();
+                if (!bucketName) {
+                    alert("Please enter a valid GCS bucket name.");
+                    return;
+                }
+
+                // Get all checked file checkboxes
+                const selectedFiles = Array.from(document.querySelectorAll('input[name="selectedFiles"]:checked'))
+                    .map(checkbox => checkbox.value);
+
+                if (selectedFiles.length === 0) {
+                    alert("Please select at least one file to copy.");
+                    return;
+                }
+
+                // Prepare the request body
+                const requestBody = {
+                    bucket: bucketName,
+                    files: selectedFiles
+                };
+
+                try {
+                    const response = await fetch("/transfer", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(\`HTTP error! Status: \$\{response.status\}\`);
+                    }
+
+                    const responseData = await response.json();
+                    console.log("Success:", responseData);
+                    alert("Files successfully copied!");
+                } catch (error) {
+                    console.error("Error:", error);
+                    alert("Failed to copy files.");
+                }
+            });
+        });
+    </script>
+
     </html>
   `;
   res.send(html);
@@ -165,6 +198,13 @@ function parseGCSUri(uri: string) {
 // A separate search/discovery mechanism will provide the actual DRS URI for the requested data object
 const AMP_PD_DRS_URI:string = process.env.AMP_PD_DRS_URI!
 const AMP_PD_DESTINATION_URI:string = process.env.AMP_PD_DESTINATION_URI!
+const AMP_PD_DRS_SERVER_URI:string = 'http://auth-pilot-drs-server:7200'
+
+app.post('/transfer', async (req: express.Request, res: express.Response) => {
+  console.log(`willy got the transfer req:${JSON.stringify(req.body)}`);
+  console.log(`willy ${req}`)
+  console.log(`willy ${req.body}`)
+})
 
 app.post('/transfer-amp-pd-data', async (req: express.Request, res: express.Response) => {
   console.log(`getting AMP PD data:${JSON.stringify(req.body)}`);
@@ -397,6 +437,21 @@ app.get('/callback', async (req: express.Request, res: express.Response) => {
     req.session.sourceAmpPdDRSUrl = AMP_PD_DRS_URI
     req.session.destinationAmpPdGCSUrl = AMP_PD_DESTINATION_URI
 
+    const listOfFilesResponse = await fetch("http://auth-pilot-drs-server:7200/list_of_files", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'passport_token': req.session.passportToken
+      })
+    });
+
+    const listOfFiles = await listOfFilesResponse.json();
+    console.log('WILLY GOT THE RESPONSE')
+    console.log(listOfFiles)
+    req.session.listOfPDFiles = listOfFiles['pd_files']
+    req.session.listOfADFiles = listOfFiles['ad_files']
     // Redirect back to the home page
     res.redirect('/');
   } catch (error) {

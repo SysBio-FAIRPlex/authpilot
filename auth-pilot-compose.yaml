@@ -6,7 +6,7 @@ services:
     image: nginx:latest
     ## Either use host network mode or uncomment the following line
     ports:
-     - "80:80"
+     - "81:80"
      - "443:443"
      - "4444:4444"
      - "4445:4445"
@@ -24,6 +24,7 @@ services:
       - intranet
 
   fairplex-client-app:
+    build: ./fairplex-client
     image: fairplex-client:0.1
     environment:
       - HYDRA_URL=http://hydra:4444
@@ -33,6 +34,7 @@ services:
       - AUTH_PILOT_TOKEN_EXCHANGE_URL=http://fairplex-token-exchange:8000/token-exchange
       - AMP_PD_DRS_URI=http://auth-pilot-amp-pd-visa-issuer:7000/drs/v1/objects/auth-pilot-test-data/test-data.txt
       - AUTH_PILOT_DATA_TRANSFER_URL=http://auth-pilot-data-transfer:7100/transfer
+      - AUTH_PILOT_DRS_SERVER_URL=http://auth-pilot-drs-server:7200
       - AMP_PD_DESTINATION_URI=gs://auth-pilot-test-data/download
     expose:
       - "5554:5554"
@@ -155,7 +157,7 @@ services:
     environment:
       - DSN=sqlite:///var/lib/sqlite/db.sqlite?_fk=true
       - LOG_LEVEL=trace
-    command: serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+    command: serve -c /etc/config/kratos/kratos-fairplex.yml --dev --watch-courier
     volumes:
       - type: volume
         source: kratos-sqlite
@@ -169,7 +171,7 @@ services:
     container_name: kratos
   
   kratos-selfservice-ui-node:
-    image: oryd/kratos-selfservice-ui-node:local
+    image: oryd/kratos-selfservice-ui-node:latest
     expose:
       - "3000:3000"
     environment:
@@ -203,6 +205,7 @@ services:
     container_name: passport-ui-node
 
   fairplex-token-exchange:
+    build: ./fairplex-token-exchange
     image: fairplex-token-exchange:0.1
     expose:
       - "8000:8000"
@@ -220,9 +223,10 @@ services:
     container_name: fairplex-token-exchange
   
   auth-pilot-amp-pd-visa-issuer:
+    build: ./auth-pilot-amp-pd-visa-issuer
     image: auth-pilot-amp-pd-visa-issuer:0.1
     volumes:
-      - /Users/haduong/Downloads/auth-spike-445014-d6cebb32a765.json:/app/service-account-key.json
+      - /home/user/auth-spike-445014-d6cebb32a765.json:/app/service-account-key.json
     environment:
       - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account-key.json
     expose:
@@ -234,6 +238,7 @@ services:
     container_name: auth-pilot-amp-pd-visa-issuer
 
   auth-pilot-data-transfer:
+    build: ./auth-pilot-data-transfer
     image: auth-pilot-data-transfer:0.1
     expose:
       - "7100:7100"
@@ -247,6 +252,22 @@ services:
     networks:
       - intranet
     container_name: auth-pilot-data-transfer
+
+  auth-pilot-drs-server:
+    build: ./auth-pilot-drs-server
+    image: auth-pilot-drs-server:0.1
+    expose:
+      - "7200:7200"
+    volumes:
+      - ~/.config/gcloud:/root/.config/gcloud:ro
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      - GOOGLE_CLOUD_PROJECT=auth-spike
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7200"]
+    restart: unless-stopped
+    networks:
+      - intranet
+    container_name: auth-pilot-drs-server
 
 networks:
   intranet:

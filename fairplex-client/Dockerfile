@@ -7,6 +7,7 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
+COPY public ./public
 RUN npm run build
 
 # # Stage 2: Create the production image
