@@ -1,0 +1,486 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-fairplex-kratos
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/upstream-vhost: fairplex.io
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: fairplex.io
+    http:
+      paths:
+        - path: /kratos(/|$)(.*)
+          pathType: ImplementationSpecific
+          backend:
+            service:
+              name: kratos-service
+              port:
+                number: 80
+        - path: /()(.*)
+          pathType: ImplementationSpecific
+          backend:
+            service:
+              name: fairplex-client-app-service
+              port:
+                number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-hydra
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: hydra
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hydra-service
+            port:
+              number: 4444
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+    name: ingress-hydra-admin
+spec:
+    ingressClassName: nginx
+    rules:
+    - host: hydra-admin
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: hydra-service
+              port:
+                number: 4445
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+    name: ingress-amp-pd-visa-issuer
+spec:
+    ingressClassName: nginx
+    rules:
+    - host: amp-pd-visa-issuer
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: amp-pd-visa-issuer-service
+              port:
+                number: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresd
+  labels:
+    app: postgresd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresd
+  template:
+    metadata:
+      labels:
+        app: postgresd
+    spec:
+      hostname: postgresd
+      containers:
+      - name: postgresd
+        image: postgres:9.6
+        ports:
+        - containerPort: 5432
+        env:
+          - name: POSTGRES_USER
+            value: hydra
+          - name: POSTGRES_PASSWORD
+            value: secret
+          - name: POSTGRES_DB
+            value: hydra
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresd-service
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: postgresd
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hydra-service
+spec:
+  type: ClusterIP
+  # clusterIP: None
+  selector:
+    app: hydra-app
+  ports:
+    - name: public-port
+      protocol: TCP
+      port: 80
+      targetPort: 4444
+    - name: admin-port
+      protocol: TCP
+      port: 4445
+      targetPort: 4445
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kratos-service
+spec:
+  type: ClusterIP
+  # clusterIP: None
+  selector:
+    app: kratos-app
+  ports:
+    - name: public-port
+      protocol: TCP
+      port: 80
+      targetPort: 4433
+    - name: admin-port
+      protocol: TCP
+      port: 4434
+      targetPort: 4434
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fairplex-client-app-service
+spec:
+  type: ClusterIP
+  # clusterIP: None
+  selector:
+    app: fairplex-client-app
+  ports:
+    - name: public-port
+      protocol: TCP
+      port: 80
+      targetPort: 5554
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fairplex-token-exchange-service
+spec:
+  type: ClusterIP
+#   clusterIP: None
+  selector:
+    app: fairplex-token-exchange-app
+  ports:
+    - name: public-port
+      protocol: TCP
+      port: 80
+      targetPort: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: amp-pd-visa-issuer-service
+spec:
+  type: ClusterIP
+#   clusterIP: None
+  selector:
+    app: amp-pd-visa-issuer-app
+  ports:
+    - name: public-port
+      protocol: TCP
+      port: 80
+      targetPort: 7000
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hydra-sqlite-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi  # Request 1 Gigabyte of storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kratos-sqlite-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi  # Request 1 Gigabyte of storage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hydra-deployment
+  labels:
+    app: hydra-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hydra-app
+  template:
+    metadata:
+      labels:
+        app: hydra-app
+    spec:
+      initContainers:
+      - name: hydra-migrate
+        image: oryd/hydra:latest
+        command:  ["hydra"]
+        args: ["migrate", "-c", "/etc/config/hydra/hydra-config.yml", "sql", "-e", "--yes"]
+        volumeMounts:
+        - name: hydra-sqlite-volume
+          mountPath: /var/lib/sqlite
+        - name: hydra-config
+          mountPath: /etc/config/hydra
+          readOnly: true
+        env:
+        - name: DSN
+          value: postgres://hydra:secret@postgresd-service:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      containers:
+      - name: hydra
+        image: oryd/hydra:latest
+        command:  ["hydra"]
+        args: ["serve", "-c", "/etc/config/hydra/hydra-config.yml", "all", "--dev"]
+        ports:
+        - containerPort: 4444
+        - containerPort: 4445
+        - containerPort: 5555
+        volumeMounts:
+        - name: hydra-sqlite-volume
+          mountPath: /var/lib/sqlite
+        - name: hydra-config
+          mountPath: /etc/config/hydra
+          readOnly: true
+        env:
+        - name: DSN
+          value: postgres://hydra:secret@postgresd-service:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      volumes:
+      - name: hydra-sqlite-volume
+        persistentVolumeClaim:
+          claimName: hydra-sqlite-pvc
+      - name: hydra-config
+        configMap:
+          name: hydra-configmap
+          items:
+            - key: hydra-config.yml
+              path: hydra-config.yml
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: create-fairplex-hydra-client
+  labels:
+    app.kubernetes.io/name: create-fairplex-hydra-client
+spec:
+  initContainers:
+  - name: init-fairplex-hydra-client
+    image: oryd/hydra:latest
+    command: ['sh', '-c', "until wget -qO- http://hydra-service:80/health/ready; do echo waiting for hydra; sleep 2; done; echo 'hydra-service healthy'"]
+  containers:
+  - name: create-fairplex-hydra-client
+    image: oryd/hydra:latest
+    command: ["/bin/sh", "-c"]
+    args: 
+      - hydra create client 
+        --endpoint http://hydra-service:4445
+        --id FAIRplex
+        --secret secret
+        --grant-type authorization_code,refresh_token
+        --response-type code,id_token
+        --format json
+        --scope openid,profile,email,ga4gh_passport_v1
+        --token-endpoint-auth-method client_secret_post
+        --redirect-uri http://fairplex.io/callback
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kratos-deployment
+  labels:
+    app: kratos-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kratos-app
+  template:
+    metadata:
+      labels:
+        app: kratos-app
+    spec:
+      initContainers:
+      - name: kratos-migrate
+        image: oryd/kratos:latest
+        command:  ["kratos"]
+        args: ["migrate", "-c", "/etc/config/kratos/kratos-config.yml", "sql", "-e", "--yes"]
+        volumeMounts:
+        - name: kratos-sqlite-volume
+          mountPath: /var/lib/sqlite
+        - name: kratos-config
+          mountPath: /etc/config/kratos
+          readOnly: true
+        env:
+          - name: DSN
+            value: sqlite:///var/lib/sqlite/db.sqlite?_fk=true&mode=rwc
+      containers:
+      - name: kratos
+        image: oryd/kratos:latest
+        command:  ["kratos"]
+        args: ["serve", "-c", "/etc/config/kratos/kratos-config.yml", "--dev", "--watch-courier"]
+        ports:
+        - containerPort: 4433
+        - containerPort: 4434
+        volumeMounts:
+        - name: kratos-sqlite-volume
+          mountPath: /var/lib/sqlite
+          readOnly: false
+        - name: kratos-config
+          mountPath: /etc/config/kratos
+          readOnly: true
+        env:
+          - name: DSN
+            value: sqlite:///var/lib/sqlite/db.sqlite?_fk=true
+          - name: LOG_LEVEL
+            value: trace
+      volumes:
+      - name: kratos-sqlite-volume
+        persistentVolumeClaim:
+          claimName: kratos-sqlite-pvc
+      - name: kratos-config
+        configMap:
+          name: kratos-configmap
+          items:
+            - key: kratos-config.yml
+              path: kratos-config.yml
+            - key: identity.schema.json
+              path: identity.schema.json
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fairplex-client-app-deployment
+  labels:
+    app: fairplex-client-app-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fairplex-client-app
+  template:
+    metadata:
+      labels:
+        app: fairplex-client-app
+    spec:
+      containers:
+      - name: fairplex-client-app
+        image: fairplex-client-app:0.1
+        ports:
+        - containerPort: 5554
+        env:
+        - name: HYDRA_URL
+          value: http://hydra
+        - name: HYDRA_ADMIN_URL
+          value: http://hydra-admin
+        - name: HYDRA_CLIENT_ID
+          value: FAIRplex
+        - name: HYDRA_CLIENT_SECRET
+          value: secret
+        - name: KRATOS_PUBLIC_URL
+          value: http://fairplex.io/kratos
+        - name: KRATOS_ADMIN_URL
+          value: http://kratos-service:4434
+        - name: KRATOS_BROWSER_URL
+          value: https://fairplex.io/kratos
+        - name: COOKIE_SECRET
+          value: changeme
+        - name: CSRF_COOKIE_NAME
+          value: cookie_name
+        - name: CSRF_COOKIE_SECRET
+          value: changeme
+        - name: DANGEROUSLY_DISABLE_SECURE_CSRF_COOKIES
+          value: "false"
+        - name: OAUTH_CALLBACK
+          value: http://fairplex.io/callback
+        - name: AUTH_PILOT_TOKEN_EXCHANGE_URL
+          value: http://fairplex-token-exchange-service/token-exchange
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fairplex-token-exchange-deployment
+  labels:
+    app: fairplex-token-exchange-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fairplex-token-exchange-app
+  template:
+    metadata:
+      labels:
+        app: fairplex-token-exchange-app
+    spec:
+      containers:
+      - name: fairplex-token-exchange
+        image: fairplex-token-exchange:0.1
+        ports:
+        - containerPort: 8000
+        env:
+        - name: HYDRA_URL
+          value: http://hydra
+        - name: HYDRA_ADMIN_URL
+          value: http://hydra-admin
+        - name: KRATOS_ADMIN_URL
+          value: http://kratos-service:4434
+        - name: AMP_PD_VISA_ISSUER_URL
+          value: http://amp-pd-visa-issuer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: amp-pd-visa-issuer-deployment
+  labels:
+    app: amp-pd-visa-issuer-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: amp-pd-visa-issuer-app
+  template:
+    metadata:
+      labels:
+        app: amp-pd-visa-issuer-app
+    spec:
+    
+      containers:
+      - name: amp-pd-visa-issuer
+        image: auth-pilot-amp-pd-visa-issuer:0.1
+        ports:
+        - containerPort: 7000
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /app/service-account-key.json
+        - name: PUBLIC_URL
+          value: amp-pd-visa-issuer
+

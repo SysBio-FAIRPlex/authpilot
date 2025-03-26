@@ -1,2 +1,3 @@
 certs/
 .DS_Store
+kubernetes/controllers/kubectl
