@@ -9,15 +9,21 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# # Stage 2: Create the production image
-# FROM node:23-alpine
+# Stage 2: Create the production image
+FROM node:23-alpine AS production
 
-# WORKDIR /app
+WORKDIR /app
+COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/dist/ ./dist/
+COPY ./public/ ./public/
+COPY ./src/views/ ./views/
+RUN npm install --omit=dev
 
-# COPY --from=builder /app/dist ./dist
+ENV NODE_ENV=production
 
-# ENV NODE_ENV=production
+ARG MY_PORT
+ENV MY_PORT ${MY_PORT}
 
-EXPOSE 5554
+EXPOSE ${MY_PORT}
 
-CMD ["node", "./dist/app.js"]
+CMD ["npx", "tsx", "./dist/app.js"]

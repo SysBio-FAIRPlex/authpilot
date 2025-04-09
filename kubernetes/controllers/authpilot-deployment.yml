@@ -329,6 +329,10 @@ spec:
       labels:
         app: kratos-app
     spec:
+      securityContext:
+        fsGroup: 1001 #<--- change here
+        runAsUser: 1001
+        runAsGroup: 1001
       initContainers:
       - name: kratos-migrate
         image: oryd/kratos:latest
@@ -337,6 +341,7 @@ spec:
         volumeMounts:
         - name: kratos-sqlite-volume
           mountPath: /var/lib/sqlite
+          readOnly: false
         - name: kratos-config
           mountPath: /etc/config/kratos
           readOnly: true

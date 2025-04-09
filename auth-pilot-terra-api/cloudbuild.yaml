@@ -1,0 +1,42 @@
+steps:
+  # Install dependencies
+  - name: python
+    entrypoint: pip
+    args: ["install", "-r", "requirements.txt", "--user"]
+
+  # Run unit tests
+  # - name: python
+  #   entrypoint: python
+  #   args: ["-m", "pytest", "--junitxml=1_test_log.xml"] 
+
+  # Docker Build
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 
+           'us-central1-docker.pkg.dev/${PROJECT_ID}/auth-pilot/auth-pilot-terra-api:1', '.']
+
+  # Docker push to Google Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push',  'us-central1-docker.pkg.dev/${PROJECT_ID}/auth-pilot/auth-pilot-terra-api:1']
+
+  # Deploy to Cloud Run
+  - name: google/cloud-sdk
+    args: ['gcloud', 'run', 'deploy', 'auth-pilot-terra-api-1', 
+           '--image=us-central1-docker.pkg.dev/${PROJECT_ID}/auth-pilot/auth-pilot-terra-api:1', 
+           '--region', 'us-central1', '--platform', 'managed', 
+           '--allow-unauthenticated']
+# Save test logs to Google Cloud Storage
+# artifacts:
+#   objects:
+#     location: gs://${_BUCKET_NAME}/
+#     paths:
+#       - 1_test_log.xml
+# Store images in Google Artifact Registry 
+images:
+  - us-central1-docker.pkg.dev/${PROJECT_ID}/auth-pilot/auth-pilot-terra-api:1
+
+# build service account
+serviceAccount: 'projects/${PROJECT_ID}/serviceAccounts/auth-pilot-service-account@${PROJECT_ID}.iam.gserviceaccount.com'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  defaultLogsBucketBehavior: REGIONAL_USER_OWNED_BUCKET

@@ -1,14 +1,11 @@
-
 # main.py
 
 import urllib.parse
-from fastapi import FastAPI, HTTPException, Form, Request
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException, Form
 from typing import Annotated, Optional, List
 from datetime import datetime, timedelta
 import uuid
 import os
-import json
 import httpx
 from contextlib import asynccontextmanager
 import jwt
@@ -18,8 +15,9 @@ import urllib
 
 HYDRA_URL = os.environ.get("HYDRA_URL", "http://hydra")
 HYDRA_ADMIN_URL = os.environ.get("HYDRA_ADMIN_URL", "http://hydra-admin:4445")
-KRATOS_ADMIN_URL = os.environ.get("KRATOS_ADMIN_URL", "https://fairplex-login.io:4434")
+KRATOS_ADMIN_URL = os.environ.get("KRATOS_ADMIN_URL", "https://kratos-admin:4434")
 AMP_PD_VISA_ISSUER_URL = os.environ.get("AMP_PD_VISA_ISSUER_URL",  "http://auth-pilot-amp-pd-visa-issuer.io:7000")
+FAIRPLEX_PASSPORT_ISS = os.environ.get("FAIRPLEX_PASSPORT_ISS", "https://sysbio-fairplex.org/")
 
 # Secret key for encoding and decoding JWT (use an environment variable in production)
 ALGORITHM = "RS256"
@@ -72,6 +70,7 @@ async def get_access_token_keyset():
 async def get_public_key(jwks_uri: str, kid: str):
     headers = {"Accept": "application/json"}
 
+    print(f'Getting public key from {jwks_uri}')
     async with httpx.AsyncClient(verify=False) as client:
         response = await client.get(jwks_uri, headers=headers)
         if response.status_code != 200:
@@ -90,11 +89,12 @@ async def get_public_key(jwks_uri: str, kid: str):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     jwk_data = await get_access_token_keyset()
-    jwk_data = jwk_data["keys"][0] # just use first key
+    jwk_data = jwk_data["keys"][0] # just use first key from Hydra
     # print(json.dumps(jwk_data, indent=2))
     key = jwcryptojwk.JWK(**jwk_data)
     global HYDRA_PEM_PRIVATE_KEY, HYDRA_PEM_PUBLIC_KEY, HYDRA_KID
-    HYDRA_PEM_PRIVATE_KEY = key.export_to_pem(private_key=True, password=None)
+    # Export Hydra private key. We must sign our tokens with the same keys that Hydra uses so that consumers can verify our token signatures with Hydra!
+    HYDRA_PEM_PRIVATE_KEY = key.export_to_pem(private_key=True, password=None) 
     HYDRA_PEM_PUBLIC_KEY = key.export_to_pem(private_key=False)
     HYDRA_KID = jwk_data["kid"]
     # print(HYDRA_PEM_PUBLIC_KEY.decode('utf-8'))
@@ -103,7 +103,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
         
 async def get_identity(id: str):
-    url = f"{KRATOS_ADMIN_URL}/admin/identities/{id}" # use this when running outside docker compose network
+    url = f"{KRATOS_ADMIN_URL}/admin/identities/{id}"
+    print(url)
     headers = {"Accept": "application/json"}
 
     async with httpx.AsyncClient(verify=False) as client:
@@ -118,7 +119,9 @@ async def get_identity(id: str):
         return data
 
 async def get_amp_pd_visas(passport_token: str) -> list[str]:
+    # url = f"http://auth-pilot-amp-pd-visa-issuer.io:7000/visas" # use this when running outside docker compose network
     url = f"{AMP_PD_VISA_ISSUER_URL}/visas" # use this when running outside docker compose network
+    print(f'Contacting {url}')
     headers = {"Accept": "application/json"}
 
     async with httpx.AsyncClient(verify=False) as client:
@@ -179,7 +182,7 @@ async def token_exchange(
                    "kid": HYDRA_KID}
         jti = str(uuid.uuid4())
         passport_payload = {
-            "iss": "https://sysbio-fairplex.org/",
+            "iss": FAIRPLEX_PASSPORT_ISS,
             "sub": identity_data["traits"]["email"],
             "aud": list(aud_list),
             "iat": now.timestamp(),
@@ -190,6 +193,7 @@ async def token_exchange(
         # print(passport_payload)
         encoded_passport_jwt = jwt.encode(passport_payload, key=HYDRA_PEM_PRIVATE_KEY, algorithm=ALGORITHM, headers=headers)
 
+        amp_pd_visas = []
         amp_pd_visas = await get_amp_pd_visas(encoded_passport_jwt)
         if len(amp_pd_visas) > 0:
             hdr = jwt.get_unverified_header(amp_pd_visas[0])
@@ -210,6 +214,7 @@ async def token_exchange(
         encoded_passport_jwt = jwt.encode(passport_payload, key=HYDRA_PEM_PRIVATE_KEY, algorithm=ALGORITHM, headers=headers)
         # print(encoded_passport_jwt)
         print(f"Successfully returning passport jti: {passport_payload['jti']}")
+        # Follow 
         return {
             "access_token": encoded_passport_jwt,
             "issued_token_type": "urn:ga4gh:params:oauth:token-type:passport",

@@ -9,4 +9,6 @@ gcloud auth application-default login
 Build Docker image
 ```
 docker build -t auth-pilot-data-transfer:0.1 .
+docker tag auth-pilot-data-transfer:0.1 us-central1-docker.pkg.dev/auth-spike-445014/auth-pilot/auth-pilot-data-transfer:0.1 && \
+docker push us-central1-docker.pkg.dev/auth-spike-445014/auth-pilot/auth-pilot-data-transfer:0.1
 ```

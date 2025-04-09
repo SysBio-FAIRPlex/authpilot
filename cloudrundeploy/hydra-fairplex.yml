@@ -1,0 +1,29 @@
+serve:
+  cookies:
+    same_site_mode: Lax
+
+urls:
+  self:
+    issuer: https://fairplex-authpilot-300966974972.us-central1.run.app/hydra
+  consent: https://fairplex-authpilot-300966974972.us-central1.run.app/consent
+  login: https://fairplex-authpilot-300966974972.us-central1.run.app/login
+  logout: https://fairplex-login.io:3000/logout
+
+
+secrets:
+  system:
+    - youReallyNeedToChangeThis
+
+oidc:
+  subject_identifiers:
+    supported_types:
+      # - pairwise
+      - public
+    pairwise:
+      salt: youReallyNeedToChangeThis
+
+strategies:
+  scope: exact
+  access_token: jwt #opaque # Use jwt for access tokens
+  jwt:
+    scope_claim: string

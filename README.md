@@ -17,3 +17,5 @@ gcloud auth application-default login
 
 ## Todos
 1. Make a separate DRS service
+
+## Cloud Run

@@ -1,0 +1,249 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: "fairplex-authpilot"
+  labels:
+    cloud.googleapis.com/location: "us-central1"
+  annotations:
+    # Required to use Cloud Run multi-containers (preview feature)
+    run.googleapis.com/launch-stage: BETA
+    run.googleapis.com/description: "FAIRplex Auth Pilot service"
+    # Externally available
+    run.googleapis.com/ingress: all
+    # Disable Cloud Run invoker IAM check
+    run.googleapis.com/invoker-iam-disabled: "true"
+    run.googleapis.com/minScale: "0"
+spec:
+  template:
+    metadata:
+      annotations:
+        # Defines container startup order within multi-container service.
+        # Below requires fairplex-client-app container to spin up before nginx container,
+        # which depends on the fairplex-client-app container.
+        # https://cloud.google.com/run/docs/configuring/containers#container-ordering
+        run.googleapis.com/container-dependencies: "{nginx: [fairplex-client-app, hydra, kratos, auth-pilot-data-transfer], fairplex-token-exchange: [hydra]}"
+        # Connect Cloud SQL instance
+        run.googleapis.com/cloudsql-instances: "auth-spike-445014:us-central1:postgres-fairplex-authpilot"
+        # Execution environment Gen1 for fast cold starts
+        run.googleapis.com/execution-environment: gen1
+    spec:
+      serviceAccountName: auth-pilot-service-account@auth-spike-445014.iam.gserviceaccount.com
+      containers:
+        # A) Serving ingress container "nginx" listening at PORT 8080
+        # Main entrypoint of multi-container service.
+        # Source is stored in nginx_config secret in Secret Manager.
+        # Any pings to this container will proxy over to fairplex-client-app container at PORT 8888.
+        # https://cloud.google.com/run/docs/container-contract#port
+        - image: nginx
+          name: nginx
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          # Referencing declared volume below,
+          # Declaring volume to mount in current ingress container's filesystem
+          # https://cloud.google.com/run/docs/reference/rest/v2/Container#volumemount
+          volumeMounts:
+            - name: nginx-conf-secret
+              readOnly: true
+              mountPath: /etc/nginx
+          startupProbe:
+            timeoutSeconds: 240
+            periodSeconds: 240
+            failureThreshold: 1
+            tcpSocket:
+              port: 8080
+            
+        # B) Sidecar container "fairplex-client-app" listening at PORT 8888,
+        # which can only be accessed by serving ingress container
+        - image: us-central1-docker.pkg.dev/auth-spike-445014/auth-pilot/fairplex-client-app:0.1
+          name: fairplex-client-app
+          env:
+            - name: MY_HOST
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app
+            - name: MY_PORT
+              value: "8888"
+            - name: HYDRA_URL
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app/hydra
+            - name: HYDRA_ADMIN_URL
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app/hydra-admin
+            - name: HYDRA_CLIENT_ID
+              value: FAIRplex
+            - name: HYDRA_CLIENT_SECRET
+              value: secret
+            - name: KRATOS_PUBLIC_URL
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app/kratos
+            - name: KRATOS_ADMIN_URL
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app/kratos-admin
+            - name: KRATOS_BROWSER_URL
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app/kratos
+            - name: OAUTH_CALLBACK
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app/callback
+            - name: AUTH_PILOT_TOKEN_EXCHANGE_URL
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app/hydra/oauth2/token-exchange
+            - name: COOKIE_SECRET
+              value: changeme
+            - name: CSRF_COOKIE_NAME
+              value: cookie_name
+            - name: CSRF_COOKIE_SECRET
+              value: changeme
+            - name: DANGEROUSLY_DISABLE_SECURE_CSRF_COOKIES
+              value: "false"
+            - name: AUTH_PILOT_DATA_TRANSFER_URL
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app/data-transfer
+            - name: AMP_PD_DRS_URI
+              value: https://fairplex-authpilot-amp-pd-300966974972.us-central1.run.app/drs/v1/objects/auth-pilot-test-data/test-data.txt
+            - name: AMP_PD_DESTINATION_URI
+              value: gs://auth-pilot-test-data/download
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 512Mi
+          startupProbe:
+            timeoutSeconds: 240
+            periodSeconds: 240
+            failureThreshold: 1
+            tcpSocket:
+              port: 8888
+
+        - image: oryd/hydra:latest
+          name: hydra
+          env:
+            - name: DSN
+              value: "postgresql:///hydra?user=hydra&password=secret&host=/cloudsql/auth-spike-445014:us-central1:postgres-fairplex-authpilot&port=5432"
+          volumeMounts:
+            - name: hydra-conf-secret
+              readOnly: true
+              mountPath: /etc/config/hydra
+          command:
+            - "/bin/sh"
+            - "-c"
+          args: "hydra migrate sql -c /etc/config/hydra/hydra-config.yml -e -y \
+            && hydra serve all -c /etc/config/hydra/hydra-config.yml --dev \
+            && (hydra delete client FAIRplex --endpoint https://fairplex-authpilot-300966974972.us-central1.run.app/hydra-admin || true) \
+            && hydra create client --endpoint https://fairplex-authpilot-300966974972.us-central1.run.app/hydra-admin \
+                --id FAIRplex --seceret secret \
+                --grant-type authorization_code,refresh_token \
+                --response-type code,id_token \
+                --format json \
+                --scope openid,profile,email,ga4gh_passport_v1 \
+                --token-endpoint-auth-method client_secret_post \
+                --redirect-uri https://fairplex-authpilot-300966974972.us-central1.run.app/callback"
+          startupProbe:
+            timeoutSeconds: 240
+            periodSeconds: 240
+            failureThreshold: 1
+            tcpSocket:
+              port: 4444
+
+        - image: oryd/kratos:latest
+          name: kratos
+          env:
+            - name: DSN
+              value: "postgresql:///kratos?user=kratos&password=secret&host=/cloudsql/auth-spike-445014:us-central1:postgres-fairplex-authpilot&port=5432"
+          volumeMounts:
+            - name: kratos-conf-secret
+              readOnly: true
+              mountPath: /etc/config/kratos
+            - name: kratos-id-schema-secret
+              readOnly: true
+              mountPath: /etc/config/kratos/schema
+          command:
+            - "/bin/sh"
+            - "-c"
+          args: "kratos migrate sql -c /etc/config/kratos/kratos-config.yml -e -y \
+            && kratos serve -c /etc/config/kratos/kratos-config.yml"
+          startupProbe:
+            timeoutSeconds: 240
+            periodSeconds: 240
+            failureThreshold: 1
+            tcpSocket:
+              port: 4433
+        
+        - image: us-central1-docker.pkg.dev/auth-spike-445014/auth-pilot/fairplex-token-exchange:0.1
+          name: fairplex-token-exchange
+          env:
+            - name: MY_PORT
+              value: "7000"
+            # We can use "localhost" here since GA4GH Passport token exchange is performed over loopback network interface 
+            # between fairplex-client-app and fairplex-token-exchange. This avoids unnecessary external network traffic.
+            - name: HYDRA_URL
+              value: http://localhost:4444
+            - name: HYDRA_ADMIN_URL
+              value: http://localhost:4445
+            # - name: HYDRA_URL
+            #   value: https://fairplex-authpilot-300966974972.us-central1.run.app/hydra
+            # - name: HYDRA_ADMIN_URL
+            #   value: https://fairplex-authpilot-300966974972.us-central1.run.app/hydra-admin
+            - name: KRATOS_ADMIN_URL
+              value: https://fairplex-authpilot-300966974972.us-central1.run.app/kratos-admin
+            - name: AMP_PD_VISA_ISSUER_URL
+              value: https://fairplex-authpilot-amp-pd-300966974972.us-central1.run.app/amp-pd-visa
+          startupProbe:
+            timeoutSeconds: 240
+            periodSeconds: 240
+            initialDelaySeconds: 2
+            failureThreshold: 3
+            tcpSocket:
+              port: 7000
+
+        # - image: us-central1-docker.pkg.dev/auth-spike-445014/auth-pilot/auth-pilot-amp-pd-visa-issuer:0.1
+        #   name: auth-pilot-amp-pd-visa-issuer
+        #   env:
+        #     - name: MY_PORT
+        #       value: "7010"
+        #     - name: HOSTNAME
+        #       value: https://fairplex-authpilot-300966974972.us-central1.run.app/amp-pd-visa
+        #     - name: AMP_PD_AUTH_URL
+        #       value: https://auth-pilot-terra-api-1-300966974972.us-central1.run.app/api/group/authpilot
+        #     - name: SERVICE_ACCOUNT
+        #       value: auth-pilot-service-account@auth-spike-445014.iam.gserviceaccount.com
+        #   startupProbe:
+        #     timeoutSeconds: 240
+        #     periodSeconds: 240
+        #     failureThreshold: 1
+        #     tcpSocket:
+        #       port: 7010
+
+        - image: us-central1-docker.pkg.dev/auth-spike-445014/auth-pilot/auth-pilot-data-transfer:0.1
+          name: auth-pilot-data-transfer
+          env:
+            - name: MY_PORT
+              value: "7100"
+          startupProbe:
+            timeoutSeconds: 240
+            periodSeconds: 240
+            failureThreshold: 1
+            tcpSocket:
+              port: 7100
+
+      # Named volumes pointing to
+      # secrets in Secret Manager
+      volumes:
+        - name: nginx-conf-secret
+          secret:
+            secretName: nginx_config
+            items:
+              - key: latest
+                path: nginx.conf
+        - name: hydra-conf-secret
+          secret:
+            secretName: hydra_config
+            items:
+              - key: latest
+                path: hydra-config.yml
+        - name: kratos-conf-secret
+          secret:
+            secretName: kratos_config
+            items:
+              - key: latest
+                path: kratos-config.yml
+        - name: kratos-id-schema-secret
+          secret:
+            secretName: kratos_id_schema
+            items:
+              - key: latest
+                path: identity.schema.json

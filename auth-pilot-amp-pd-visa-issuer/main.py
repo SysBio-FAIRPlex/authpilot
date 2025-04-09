@@ -15,6 +15,10 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 from google.cloud import storage
+import google.auth
+from google.auth import compute_engine
+from google.auth.transport import requests
+
 
 PASSPHRASE = "mySecretPassphrase"
 PRIVATE_KEY = None
@@ -65,7 +69,8 @@ async def get_amp_pd_groups():
     global AMP_PD_GROUPS
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            auth_pilot_terra_groups_url = "https://auth-pilot-terra-api-1-300966974972.us-central1.run.app/api/group/authpilot"
+            auth_pilot_terra_groups_url = os.environ.get('AMP_PD_AUTH_URL')
+            # auth_pilot_terra_groups_url = "https://auth-pilot-terra-api-1-300966974972.us-central1.run.app/api/group/authpilot"
             headers = {'accept': 'application/json'}
             response = await client.get(auth_pilot_terra_groups_url, headers=headers)
             response.raise_for_status()  # Raise an error for bad responses
@@ -157,11 +162,12 @@ async def get_visas(request: VisaRequest):
             # User is in the approved group. Create Visas for AMP PD 
             # Each is signed separately
             now = datetime.now()
+            hostname = os.environ.get('HOSTNAME', 'auth-pilot-amp-pd-visa-issuer.io')
             headers={
                 "typ": "vnd.ga4gh.visa+jwt", # Visa Document Token Format https://ga4gh.github.io/data-security/aai-openid-connect-profile#visa-document-token-format
                 "alg": "RS256", "kid": "VISA_KEY",
                 # "jku": "http://host.docker.internal:7000/.well-known/jwks.json",
-                "jku": f"http://{os.environ.get('HOSTNAME', 'auth-pilot-amp-pd-visa-issuer.io')}:7000/.well-known/jwks.json", 
+                "jku": f"{hostname}/.well-known/jwks.json", 
                 "kid": PUBLIC_JWK["kid"]
             }
             tier1_visa_payload = {
@@ -205,7 +211,7 @@ async def get_visas(request: VisaRequest):
 
 
 ######################################################
-# Mock a DRS server. Generate signed URLj on demand.
+# Mock a DRS server. Generate signed URL on demand.
 ######################################################
 
 # command to create signed url:
@@ -214,12 +220,19 @@ async def get_visas(request: VisaRequest):
 def generate_download_signed_url_v4(bucket_name, blob_name):
     """Generates a v4 signed URL for downloading a blob.
 
-    Note that this method requires a service account key file (GOOGLE_APPLICATION_CREDENTIALS).
-    You can not use this if you are using Application Default Credentials from Google Compute
-    Engine or from the Google Cloud SDK.
+    This method uses the Service Account for this Cloud Run service.
+    The Service Account needs the roles/iam.serviceAccountTokenCreator role.
     """
-    # bucket_name = 'your-bucket-name'
-    # blob_name = 'your-object-name'
+    credentials, _ = google.auth.default()
+    
+    auth_request = requests.Request()
+    credentials.refresh(auth_request)
+    
+    signing_credentials = compute_engine.IDTokenCredentials(
+      auth_request,
+      "",
+      service_account_email=os.environ.get("SERVICE_ACCOUNT")
+    )
 
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
@@ -231,6 +244,7 @@ def generate_download_signed_url_v4(bucket_name, blob_name):
         expiration=timedelta(minutes=15),
         # Allow GET requests using this URL.
         method="GET",
+        credentials=signing_credentials
     )
 
     print("Generated GET signed URL:")

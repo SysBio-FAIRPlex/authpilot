@@ -10,7 +10,7 @@ data:
 
     serve:
       public:
-        base_url: https://fairplex.io/kratos
+        base_url: http://35.223.205.63/kratos
         cors:
           enabled: true
       admin:

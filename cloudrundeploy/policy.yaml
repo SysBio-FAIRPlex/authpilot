@@ -1,0 +1,5 @@
+# gcloud run services set-iam-policy SERVICE policy.yaml
+bindings:
+- members:
+  - allUsers
+  role: roles/run.invoker

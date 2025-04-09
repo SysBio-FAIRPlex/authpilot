@@ -1,0 +1,144 @@
+version: v0.7.1-alpha.1
+
+dsn: memory
+
+serve:
+  public:
+    base_url: https://fairplex-authpilot-300966974972.us-central1.run.app/kratos
+    cors:
+      enabled: true
+      allowed_origins:
+        - https://fairplex-authpilot-300966974972.us-central1.run.app
+      allowed_headers:
+        - Authorization
+        - Cookie
+        - Content-Type
+      exposed_headers:
+        - Content-Type
+        - Set-Cookie
+      allow_credentials: true
+      options_passthrough: true  
+  admin:
+    base_url: https://fairplex-authpilot-300966974972.us-central1.run.app/kratos-admin
+
+selfservice:
+  default_browser_return_url: https://fairplex-authpilot-300966974972.us-central1.run.app
+  allowed_return_urls:
+    - https://fairplex-authpilot-300966974972.us-central1.run.app
+    - https://fairplex-authpilot-300966974972.us-central1.run.app/hydra
+  methods:
+    password:
+      enabled: false #true
+    oidc:
+      config:
+        providers:
+          - id: google # this is `<provider-id>` in the Authorization callback URL. DO NOT CHANGE IT ONCE SET!
+            provider: google
+            client_id:  # SysBio OAuth2 Client ID
+            client_secret:  # SysBio OAuth2 Client secret
+            mapper_url: "base64://bG9jYWwgY2xhaW1zID0gewogIGVtYWlsX3ZlcmlmaWVkOiBmYWxzZSwKfSArIHN0ZC5leHRWYXIoJ2NsYWltcycpOwoKewogIGlkZW50aXR5OiB7CiAgICB0cmFpdHM6IHsKICAgICAgW2lmICdlbWFpbCcgaW4gY2xhaW1zICYmIGNsYWltcy5lbWFpbF92ZXJpZmllZCB0aGVuICdlbWFpbCcgZWxzZSBudWxsXTogY2xhaW1zLmVtYWlsLAogICAgICBuYW1lOiB7CiAgICAgICAgZmlyc3Q6IGNsYWltcy5naXZlbl9uYW1lLAogICAgICAgIGxhc3Q6IGNsYWltcy5mYW1pbHlfbmFtZQogICAgICB9LAogICAgICBbaWYgJ2hkJyBpbiBjbGFpbXMgdGhlbiAnaGQnIGVsc2UgbnVsbF06IGNsYWltcy5oZCwKICAgIH0sCiAgfSwKfQ=="
+            issuer_url: https://accounts.google.com
+            auth_url: https://accounts.google.com/o/oauth2/v2/auth
+            token_url: https://www.googleapis.com/oauth2/v4/token
+            scope:
+              - email
+              - profile
+              - openid
+              # - https://www.googleapis.com/auth/devstorage.read_write # Google Cloud Storage
+              # - offline_access
+            # other supported scopes can be found in Google OAuth 2.0 dev docs
+            requested_claims:
+              id_token:
+                email:
+                  essential: true
+                email_verified:
+                  essential: false
+                given_name:
+                  essential: true
+                family_name: null
+                hd: null
+      enabled: true
+
+  flows:
+    error:
+      ui_url: http://127.0.0.1:4455/error
+
+    settings:
+      ui_url: http://127.0.0.1:4455/settings
+      privileged_session_max_age: 15m
+
+    recovery:
+      enabled: true
+      ui_url: http://127.0.0.1:4455/recovery
+
+    verification:
+      enabled: true
+      ui_url: http://127.0.0.1:4455/verification
+      after:
+        default_browser_return_url: http://127.0.0.1:4455/
+
+    logout:
+      after:
+        default_browser_return_url: http://127.0.0.1:4455/login
+
+    login:
+      ui_url: https://fairplex-authpilot-300966974972.us-central1.run.app/login
+      lifespan: 10m
+
+    registration:
+      lifespan: 10m
+      ui_url: http://127.0.0.1:4455/registration
+      after:
+        password:
+          hooks:
+            -
+              hook: session
+            -
+              hook: web_hook
+              config:
+                url: http://127.0.0.1:4501/admin/ga4gh/passport/v1/users
+                method: POST
+                body: file:///etc/config/kratos/register.jsonnet
+        oidc:
+          default_browser_return_url: http://127.0.0.1:4455
+          hooks:
+            -
+              hook: session
+            -
+              hook: web_hook
+              config:
+                url: http://127.0.0.1:4501/admin/ga4gh/passport/v1/users
+                method: POST
+                body: file:///etc/config/kratos/register.jsonnet
+
+log:
+  level: debug
+  format: text
+  leak_sensitive_values: true
+
+secrets:
+  cookie:
+    - PLEASE-CHANGE-ME-I-AM-VERY-INSECURE
+  cipher:
+    - 32-LONG-SECRET-NOT-SECURE-AT-ALL
+
+ciphers:
+  algorithm: xchacha20-poly1305
+
+hashers:
+  algorithm: bcrypt
+  bcrypt:
+    cost: 8
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/kratos/schema/identity.schema.json
+
+courier:
+  smtp:
+    connection_uri: smtps://test:test@mailslurper:4437/?skip_ssl_verify=true
+
+oauth2_provider:
+  url: https://fairplex-authpilot-300966974972.us-central1.run.app/hydra-admin

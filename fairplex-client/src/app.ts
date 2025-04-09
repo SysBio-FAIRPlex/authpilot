@@ -1,73 +1,141 @@
-import express from 'express';
-import session from 'express-session';
-import * as client from 'openid-client'
+import express, { Express, Request, Response } from "express"
+import { engine } from "express-handlebars"
+import * as openid_client from 'openid-client'
 import { jwtDecode, JwtPayload } from "jwt-decode";
 import cookieParser from 'cookie-parser';
+import { DoubleCsrfCookieOptions, doubleCsrf } from "csrf-csrf"
 import jwt, { JsonWebTokenError } from 'jsonwebtoken';
 import jwkToPem from 'jwk-to-pem';
 import bodyParser from 'body-parser';
+import { handlebarsHelpers } from './pkg';
+import { logger, middleware as middlewareLogger } from "./pkg/logger"
+import {
+  registerConsentRoute,
+  registerLoginRoute,
+  registerStaticRoutes
+} from './routes'
+import { csrfErrorHandler } from "./routes/csrfError"
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-// Extend express-session declarations
-declare module 'express-session' {
-  interface SessionData {
-    code_verifier?: string;
-    // id_token?: string;
-    // access_token?: string;
-    state?: string;
-    // payload?: any;
-    accessTokenDecoded?: JwtPayload;
-    idTokenDecoded?: JwtPayload;
-    passportToken? : string;
-    passportTokenDecoded?: JwtPayload;
-    // pemId?: string;
-    // pemAccess?: string;
-    idTokenVerified? : boolean;
-    accessTokenVerified? : boolean;
-    passportTokenVerified? : boolean;
-    destinationAmpPdGCSUrl? : string;
-    sourceAmpPdDRSUrl? : string;
-    ampPdDataTransferredTo? : string;
-    ampPdDataTransferredMessage? : string;
-  }
+// import session, {MemoryStore} from 'express-session';
+// import {createClient} from 'redis';
+// import { RedisStore } from 'connect-redis';
+
+// const REDIS_CLIENT = createClient()
+// REDIS_CLIENT.connect().catch(console.error)
+// const redis_store = new RedisStore({
+//   client: REDIS_CLIENT,
+//   prefix: 'fairplex-client:'
+// })
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+
+export interface CustomSessionData {
+  code_verifier?: string;
+  id_token?: string;
+  access_token?: string;
+  state?: string;
+  // payload?: any;
+  accessTokenDecoded?: JwtPayload;
+  idTokenDecoded?: JwtPayload;
+  passportToken?: string;
+  passportTokenDecoded?: JwtPayload;
+  // pemId?: string;
+  // pemAccess?: string;
+  idTokenVerified?: boolean;
+  accessTokenVerified?: boolean;
+  passportTokenVerified?: boolean;
+  destinationAmpPdGCSUrl?: string;
+  sourceAmpPdDRSUrl?: string;
+  ampPdDataTransferredTo?: string;
+  ampPdDataTransferredMessage?: string;
 }
 
-const app = express();
-const port = 5554;
 
-// Configure session middleware
-app.use(
-  session({
-    secret: 'your-secret-key',
-    resave: false,
-    saveUninitialized: true,
-  })
-);
-app.use(cookieParser());
+const cookieOptions: DoubleCsrfCookieOptions = {
+  sameSite: "lax",
+  signed: true,
+  // set secure cookies by default (recommended in production)
+  // can be disabled through DANGEROUSLY_DISABLE_SECURE_COOKIES=true env var
+  secure: true,
+  ...(process.env.DANGEROUSLY_DISABLE_SECURE_CSRF_COOKIES && {
+    secure: false,
+  }),
+}
+
+const cookieName = process.env.CSRF_COOKIE_NAME || "__Host-ax-x-csrf-token"
+const cookieSecret = process.env.CSRF_COOKIE_SECRET
+
+// Sets up csrf protection
+const {
+  invalidCsrfTokenError,
+  generateToken,
+  validateRequest,
+  doubleCsrfProtection, // This is the default CSRF protection middleware.
+} = doubleCsrf({
+  getSecret: () => cookieSecret || "", // A function that optionally takes the request and returns a secret
+  cookieName: cookieName, // The name of the cookie to be used, recommend using Host prefix.
+  cookieOptions,
+  ignoredMethods: ["GET", "HEAD", "OPTIONS", "PUT", "DELETE"], // A list of request methods that will not be protected.
+  getTokenFromRequest: (req: Request) => {
+    logger.debug("Getting CSRF token from request", { body: req.body })
+    return req.body._csrf
+  }, // A function that returns the token from the request
+})
+
+const app: Express = express();
+const router = express.Router();
+const port = process.env.MY_PORT;
+app.use(cookieParser(process.env.COOKIE_SECRET || ""))
 app.use(bodyParser.urlencoded({extended:false}))
+app.use(middlewareLogger)
+app.set("view engine", "hbs")
+app.engine(
+  "hbs",
+  engine({
+    extname: "hbs",
+    layoutsDir: `${__dirname}/../views/layouts/`,
+    partialsDir: `${__dirname}/../views/partials/`,
+    defaultLayout: "auth",
+    helpers: handlebarsHelpers,
+  }),
+)
 
-// let server: URL = new URL('http://hydra:4444/.well-known/openid-configuration') // Authorization Server's Issuer Identifier
+const customSession = new Map<string, CustomSessionData>();
+
+registerLoginRoute(router)
+// all routes registered under the /consent path are protected by CSRF
+router.use("/consent", doubleCsrfProtection)
+router.use("/consent", csrfErrorHandler(invalidCsrfTokenError))
+registerConsentRoute(router)
+registerStaticRoutes(router)
+
 let server: URL = new URL(`${process.env.HYDRA_URL}/.well-known/openid-configuration`) // Authorization Server's Issuer Identifier
 let clientId: string = process.env.HYDRA_CLIENT_ID! // Client identifier at the Authorization Server
 let clientSecret: string = process.env.HYDRA_CLIENT_SECRET! // Client Secret
 
-let config: client.Configuration = await client.discovery(
-  server,
-  clientId,
-  clientSecret,
-  undefined,
-  {
-    execute: [client.allowInsecureRequests],
-  },
-)
+let config: openid_client.Configuration;
+
 
 // Serve the login page
-app.get('/', (req: express.Request, res: express.Response) => {
-  const idToken = req.cookies.idToken || 'Not authenticated';
-  const decodedIdToken = req.session.idTokenDecoded || 'Not authenticated';
-  const accessToken = req.cookies.accessToken || 'Not authenticated';
-  const decodedAccessToken = req.session.accessTokenDecoded || 'Not authenticated';
-  const passportToken = req.session.passportToken || 'Not authenticated';
-  const decodedPassportToken = req.session.passportTokenDecoded || 'Not authenticated';
+router.get('/',  async (req: Request, res: Response) => {
+
+  let this_session : CustomSessionData | undefined;
+  if (req.cookies.sessionID) {
+    this_session = customSession.get(req.cookies.sessionID);
+    console.log(`got session for id ${req.cookies.sessionID}`)
+  } else {
+    console.log(`home No session for id ${req.cookies.sessionID}`)
+  }
+  const idToken = this_session?.id_token || 'Not authenticated';
+  const decodedIdToken = this_session?.idTokenDecoded || 'Not authenticated';
+  const accessToken = this_session?.access_token || 'Not authenticated';
+  const decodedAccessToken = this_session?.accessTokenDecoded || 'Not authenticated';
+  const passportToken = this_session?.passportToken || 'Not authenticated';
+  const decodedPassportToken = this_session?.passportTokenDecoded || 'Not authenticated';
   const html = `
     <!DOCTYPE html>
     <html>
@@ -87,11 +155,12 @@ app.get('/', (req: express.Request, res: express.Response) => {
             background-color: light-gray;
           }
         </style>
+        <base href="/">
       </head>
       <body>
         <h1>FAIRplex GA4GH Federated Authentication Pilot</h1>
-        <button onclick="window.location.href='/login'">Login</button>
-        ${req.session.idTokenDecoded
+        <button onclick="window.location.href='/login-start-flow'">Login</button>
+        ${this_session
         ? `<div class="token-display">
                 <h3>OpenID Token:</h3>
                 <p>${idToken}</p>
@@ -99,7 +168,7 @@ app.get('/', (req: express.Request, res: express.Response) => {
                <div class="token-display">
                 <h3>OpenID Token Payload:</h3>
                 <pre>${JSON.stringify(decodedIdToken, null, 2)}</pre>
-                <bold>Signature verified: ${req.session.idTokenVerified}</bold>
+                <bold>Signature verified: ${this_session?.idTokenVerified}</bold>
               </div>
           <div class="token-display">
                 <h3>OAuth2 Access Token:</h3>
@@ -108,7 +177,7 @@ app.get('/', (req: express.Request, res: express.Response) => {
                <div class="token-display">
                 <h3>OAuth2 Access Token Payload:</h3>
                 <pre>${JSON.stringify(decodedAccessToken, null, 2)}</pre>
-                <bold>Signature verified: ${req.session.accessTokenVerified}</bold>
+                <bold>Signature verified: ${this_session?.accessTokenVerified}</bold>
               </div>
           <div class="token-display">
                 <h3>GA4GH Passport Token:</h3>
@@ -117,7 +186,7 @@ app.get('/', (req: express.Request, res: express.Response) => {
                <div class="token-display">
                 <h3>GA4GH Passport Payload:</h3>
                 <pre>${JSON.stringify(decodedPassportToken, null, 2)}</pre>
-                <bold>Signature verified: ${req.session.accessTokenVerified}</bold>
+                <bold>Signature verified: ${this_session?.passportTokenVerified}</bold>
               </div>
           <br>
           <hr>
@@ -125,21 +194,21 @@ app.get('/', (req: express.Request, res: express.Response) => {
           <form action="/transfer-amp-pd-data" method="POST">
           <label for="amp-pd-data-source" class="label1">Source DRS URI</label>
             <input type="text" id="amp-pd-data-source" name="amp-pd-data-source" size="100" 
-              value=${req.session.sourceAmpPdDRSUrl}><br><br>
+              value=${this_session?.sourceAmpPdDRSUrl}><br><br>
           <label for="amp-pd-data-destination" class="label1">Destination Bucket</label>
             <input type="text" id="amp-pd-data-destination" name="amp-pd-data-destination" size="100" 
-              value=${req.session.destinationAmpPdGCSUrl}><br><br>
+              value=${this_session?.destinationAmpPdGCSUrl}><br><br>
             <input type="submit" value="Transfer AMP PD Data">
           </form>
               `
         : ''
         }
-        ${req.session.ampPdDataTransferredMessage
+        ${this_session?.ampPdDataTransferredMessage
         ? `<div class="token-display">
                 <h4>AMP PD Data Transferred To:</h4>
-                <p>${req.session.ampPdDataTransferredTo}</p>
+                <p>${this_session?.ampPdDataTransferredTo}</p>
                 <h4>Message:</h4>
-                <p>${req.session.ampPdDataTransferredMessage}</p>
+                <p>${this_session?.ampPdDataTransferredMessage}</p>
             </div>`
         : ''
         }
@@ -166,17 +235,22 @@ function parseGCSUri(uri: string) {
 const AMP_PD_DRS_URI:string = process.env.AMP_PD_DRS_URI!
 const AMP_PD_DESTINATION_URI:string = process.env.AMP_PD_DESTINATION_URI!
 
-app.post('/transfer-amp-pd-data', async (req: express.Request, res: express.Response) => {
+router.post('/transfer-amp-pd-data', async (req: express.Request, res: express.Response) => {
   console.log(`getting AMP PD data:${JSON.stringify(req.body)}`);
-  req.session.sourceAmpPdDRSUrl = req.body['amp-pd-data-source']
-  req.session.destinationAmpPdGCSUrl = req.body['amp-pd-data-destination']
-  const {bucket:dest_bucket, path:dest_path} = parseGCSUri(req.session.destinationAmpPdGCSUrl!)
-  const response = await fetch(req.session.sourceAmpPdDRSUrl!, {
+  const this_session = customSession.get(req.cookies.sessionID)
+  if (!this_session) {
+    console.error(`Did not find session in transfer for id ${req.cookies.sessionID}`)
+    return
+  }
+  this_session.sourceAmpPdDRSUrl = req.body['amp-pd-data-source']
+  this_session.destinationAmpPdGCSUrl = req.body['amp-pd-data-destination']
+  const {bucket:dest_bucket, path:dest_path} = parseGCSUri(this_session.destinationAmpPdGCSUrl!)
+  const response = await fetch(this_session.sourceAmpPdDRSUrl!, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({'passports':[req.session.passportToken]}),
+    body: JSON.stringify({'passports':[this_session.passportToken]}),
   
   });
   const data = await response.json()
@@ -196,15 +270,25 @@ app.post('/transfer-amp-pd-data', async (req: express.Request, res: express.Resp
 
   const dataTransferResult = await downloadresponse.json()
   console.log(dataTransferResult)
-  req.session.ampPdDataTransferredTo = dataTransferResult['gcs_url']
-  req.session.ampPdDataTransferredMessage = dataTransferResult['message']
+  this_session.ampPdDataTransferredTo = dataTransferResult['gcs_url']
+  this_session.ampPdDataTransferredMessage = dataTransferResult['message']
 
   res.redirect('/')
 })
 
 // Handle login initiation
-app.get('/login', async (req: express.Request, res: express.Response) => {
-  /**
+router.get('/login-start-flow', async (req: Request, res: Response) => {
+  if (config === undefined) {
+    config = await openid_client.discovery(
+      server,
+      clientId,
+      clientSecret,
+      undefined,
+      {
+        execute: [openid_client.allowInsecureRequests],
+      },
+    )
+  }  /**
  * Value used in the authorization request as the redirect_uri parameter, this
  * is typically pre-registered at the Authorization Server.
  */
@@ -216,12 +300,20 @@ app.get('/login', async (req: express.Request, res: express.Response) => {
    * end-user session such that it can be recovered as the user gets redirected
    * from the authorization server back to your application.
    */
-  let code_verifier: string = client.randomPKCECodeVerifier()
-  let code_challenge: string = await client.calculatePKCECodeChallenge(code_verifier)
-  let state: string = client.randomState()
+  let code_verifier: string = openid_client.randomPKCECodeVerifier()
+  let code_challenge: string = await openid_client.calculatePKCECodeChallenge(code_verifier)
+  let state: string = openid_client.randomState()
   // Store the code_verifier in session for later use
-  req.session.code_verifier = code_verifier;
-  req.session.state = state
+  res.cookie('sessionID', state,
+    {
+      httpOnly: true,
+      secure: true, // Use true in production. Requires HTTPS
+      sameSite: 'lax',
+      maxAge: 3600000, // 1 hour in milliseconds
+      path: '/'
+    }
+  )
+  customSession.set(state, {state:state, code_verifier:code_verifier} as CustomSessionData)
 
   let parameters: Record<string, string> = {
     redirect_uri,
@@ -241,29 +333,32 @@ app.get('/login', async (req: express.Request, res: express.Response) => {
   //   parameters.state = state
   // }
 
-  let redirectTo: URL = client.buildAuthorizationUrl(config, parameters)
+  let redirectTo: URL = openid_client.buildAuthorizationUrl(config, parameters)
 
-  // now redirect the user to redirectTo.href
-  console.log('redirecting to', redirectTo.href)
+  // now redirect the user to redirectTo.href (Hydra)
+  console.log('fairplex-client/login-start-flow redirecting to', redirectTo.href)
 
   res.redirect(redirectTo.href);
 });
 
 // Handle the callback from the OIDC provider
-app.get('/callback', async (req: express.Request, res: express.Response) => {
+router.get('/callback', async (req: Request, res: Response) => {
   try {
-    // const params = client.callbackParams(req);
-
-    if (!req.session.code_verifier) {
-      throw new Error('Missing code_verifier in session');
+    const this_session = customSession.get(req.cookies.sessionID)
+    if (!this_session) {
+      console.error(`callback Did not find session for ${req.cookies.sessionID}`)
+      return
     }
-    const currentUrl = new URL(`${req.protocol}://${req.get('host')}${req.originalUrl}`);
-    let tokens: client.TokenEndpointResponse = await client.authorizationCodeGrant(
+
+    // const currentUrl = new URL(`${req.protocol}://${req.get('host')}${req.originalUrl}`);
+    const currentUrl = new URL(`${process.env.MY_HOST}${req.originalUrl}`);
+    console.log(`oauth callback currentUrl=${currentUrl}`)
+    let tokens: openid_client.TokenEndpointResponse = await openid_client.authorizationCodeGrant(
       config,
       currentUrl,
       {
-        pkceCodeVerifier: req.session.code_verifier,
-        expectedState: req.session.state,
+        pkceCodeVerifier: this_session.code_verifier,
+        expectedState: this_session.state,
       },
       {
         tokenEndpointAuthMethod: 'client_secret_post',
@@ -271,12 +366,13 @@ app.get('/callback', async (req: express.Request, res: express.Response) => {
     )
 
     console.log('Token Endpoint Response', tokens)
-    // Store the access token in session. NOT SECURE. DO NOT DO THIS.
+    this_session.id_token = tokens.id_token!;
     const decodedIdToken = jwtDecode(tokens.id_token!);
-    req.session.idTokenDecoded = decodedIdToken;
+    this_session.idTokenDecoded = decodedIdToken;
     console.log('Decoded Id Token', decodedIdToken);
+    this_session.access_token = tokens.access_token;
     const decodedAccessToken = jwtDecode(tokens.access_token);
-    req.session.accessTokenDecoded = decodedAccessToken;
+    this_session.accessTokenDecoded = decodedAccessToken;
     console.log('Decoded Access Token', decodedAccessToken);
 
     // Get public key from JWKS endpoint
@@ -298,12 +394,15 @@ app.get('/callback', async (req: express.Request, res: express.Response) => {
     for (const jwk of jwksData['keys']) {
       try {
         const pem_id = jwkToPem(jwk);
-        // req.session.pemId = pem_id;
+        // req.session?.pemId = pem_id;
         const verifiedIdToken = jwt.verify(tokens.id_token!, pem_id, {algorithms: ['RS256']});
-        req.session.idTokenVerified = verifiedIdToken !== undefined;
-        console.log('Verified Id Token', verifiedIdToken);
-      }
-      catch(error) {
+        this_session.idTokenVerified = verifiedIdToken !== undefined;
+        if (this_session.idTokenVerified) {
+          console.log('Verified Id Token', verifiedIdToken);
+          break;
+        }
+      } catch(error) {
+        console.error("ERROR while verifying ID token:"+error)
       }
     }
 
@@ -311,47 +410,19 @@ app.get('/callback', async (req: express.Request, res: express.Response) => {
     for (const jwk of jwksData['keys']) {
       try {
         const pemAccess = jwkToPem(jwk);
-        // req.session.pemAccess = pemAccess;
+        // req.session?.pemAccess = pemAccess;
         const verifiedAccessToken = jwt.verify(tokens.access_token, pemAccess, {algorithms: ['RS256']});
-        req.session.accessTokenVerified = verifiedAccessToken !== undefined;
-        console.log('Verified Access Token', verifiedAccessToken);
-      }
-      catch(error) {
+        this_session.accessTokenVerified = verifiedAccessToken !== undefined;
+        if (this_session.accessTokenVerified) {
+            console.log('Verified Access Token', verifiedAccessToken);
+            break;
+        }
+      } catch(error) {
+        console.error("ERROR while verifying access token:"+error)
       }
     }
-    
-    // Store the id token in a secure, HTTP-only cookie
-    // Uh-oh, cookies are too big
-    res.cookie('idToken', tokens.id_token, {
-      httpOnly: true,
-      secure: true, // Use in production
-      sameSite: 'lax',
-      maxAge: 3600000, // 1 hour in milliseconds
-      path: '/'
-    });
-    // console.log('Decoded Id Token', decodedIdToken);
-    // res.cookie('decodedIdToken', decodedIdToken, {
-    //   httpOnly: true,
-    //   secure: true, // Use in production
-    //   sameSite: 'lax',
-    //   maxAge: 3600000, // 1 hour in milliseconds
-    //   path: '/'
-    // });
-    // // Store the access token in a secure, HTTP-only cookie
-    res.cookie('accessToken', tokens.access_token, {
-      httpOnly: true,
-      secure: true, // Use in production
-      sameSite: 'lax',
-      maxAge: 3600000, // 1 hour in milliseconds
-      path: '/'
-    });
-    // res.cookie('decodedAccessToken', decodedAccessToken, {
-    //   httpOnly: true,
-    //   secure: true, // Use in production
-    //   sameSite: 'lax',
-    //   maxAge: 3600000, // 1 hour in milliseconds
-    //   path: '/'
-    // });
+
+    this_session.idTokenDecoded = decodedIdToken
 
     // Token exchange for passport
     const tokenExchangeUrl = process.env.AUTH_PILOT_TOKEN_EXCHANGE_URL!
@@ -371,33 +442,27 @@ app.get('/callback', async (req: express.Request, res: express.Response) => {
 
     const passportResult = await response.json();
     console.log('Passport Token exchange result', passportResult);
-    // res.cookie('passportToken', passportResult.access_token, {
-    //   httpOnly: true,
-    //   secure: true, // Use in production
-    //   sameSite: 'lax',
-    //   maxAge: 3600000, // 1 hour in milliseconds
-    //   path: '/'
-    // });
-    req.session.passportToken = passportResult.access_token;
-    req.session.passportTokenDecoded = jwtDecode(passportResult.access_token);
-    console.log('Decoded Passport Token', req.session.passportTokenDecoded);
+
+    this_session.passportToken = passportResult.access_token;
+    this_session.passportTokenDecoded = jwtDecode(passportResult.access_token);
+    console.log('Decoded Passport Token', this_session.passportTokenDecoded);
 
     // Verify the passport token using the public key
     for (const jwk of jwksData['keys']) {
       try {
         const pemAccess = jwkToPem(jwk);
         const verifiedPassport = jwt.verify(passportResult.access_token, pemAccess, {algorithms: ['RS256']});
-        req.session.passportTokenVerified = verifiedPassport !== undefined;
+        this_session.passportTokenVerified = verifiedPassport !== undefined;
         console.log('Verified Passport Token', verifiedPassport);
       }
       catch(error) {
       }
     }
 
-    req.session.sourceAmpPdDRSUrl = AMP_PD_DRS_URI
-    req.session.destinationAmpPdGCSUrl = AMP_PD_DESTINATION_URI
+    this_session.sourceAmpPdDRSUrl = AMP_PD_DRS_URI
+    this_session.destinationAmpPdGCSUrl = AMP_PD_DESTINATION_URI
 
-    // Redirect back to the home page
+    // // Redirect back to the home page
     res.redirect('/');
   } catch (error) {
     console.error('Error during authentication:', error);
@@ -405,6 +470,9 @@ app.get('/callback', async (req: express.Request, res: express.Response) => {
   }
 });
 
+
+app.use('/', router)
+
 app.listen(port, () => {
-  console.log(`App listening at http://127.0.0.1:${port}`);
+  console.log(`App listening at port ${port}`);
 });

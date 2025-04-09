@@ -1,3 +1,7 @@
 certs/
 .DS_Store
+**/._*
 kubernetes/controllers/kubectl
+**/node_modules
+**/dist
+**/.venv
