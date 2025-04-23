@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# SQLite database files
+*.db
+*.sqlite3
+
+# Environment variables
+.env
+
+# Virtual environment
+venv/
+.env/
+.venv/
+env/
+ENV/
+
+# Logs
+*.log
+
+# IDE/editor folders
+.vscode/
+.idea/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Generated certs file
+certs/
