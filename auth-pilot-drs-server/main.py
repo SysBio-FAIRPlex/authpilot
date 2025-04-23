@@ -9,7 +9,7 @@ from google.cloud import storage
 import uuid
 
 app = FastAPI()
-client = storage.Client()
+storage_client = storage.Client()
 # spds stands for syntehtic proteomics dataset
 BUCKET_NAME = "amp-pd-community-workspace-spds"
 
@@ -34,7 +34,7 @@ def get_object(object_id: str):
     if not blob_name:
         raise HTTPException(status_code=404, detail="Object ID not found")
 
-    bucket = client.bucket(BUCKET_NAME)
+    bucket = storage_client.bucket(BUCKET_NAME)
     blob = bucket.blob(blob_name)
     if blob.exists():
         return {
@@ -52,7 +52,7 @@ def get_access_url(object_id: str):
     if not blob_name:
         raise HTTPException(status_code=404, detail="Object ID not found")
 
-    bucket = client.bucket(BUCKET_NAME)
+    bucket = storage_client.bucket(BUCKET_NAME)
     blob = bucket.blob(blob_name)
     if blob.exists():
         #return [DRSAccessURL(url=f"https://storage.googleapis.com/{BUCKET_NAME}/{blob.name}")]
@@ -62,12 +62,28 @@ def get_access_url(object_id: str):
 
 @app.post("/register")
 def register_object(blob_name: str):
-    bucket = client.bucket(BUCKET_NAME)
+    bucket = storage_client.bucket(BUCKET_NAME)
     blob = bucket.blob(blob_name)
     if not blob.exists():
         raise HTTPException(status_code=404, detail="Blob not found in bucket")
     drs_id = get_or_create_drs_id(blob_name)
     return {"drs_id": drs_id}
+
+class TransferRequest(BaseModel):
+    dst_bucket: str
+    list_of_files: List[str]
+
+@app.post("/transfer")
+def transfer(request: TransferRequest):
+    for filename in request.list_of_files:
+        source_bucket_name = "willyn-dsub-test"
+        source_bucket = storage_client.bucket(source_bucket_name)
+        source_blob = source_bucket.blob(filename)
+
+        destination_bucket = storage_client.bucket(request.dst_bucket)
+
+        source_bucket.copy_blob(source_blob, destination_bucket, filename)
+    return {'message': 'ok'}
 
 # Define the request body model
 class ListOfFilesRequest(BaseModel):

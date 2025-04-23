@@ -50,6 +50,7 @@ app.use(bodyParser.urlencoded({extended:false}))
 // Serve static files from the 'public' directory
 // app.use('/public', express.static(path.join(process.cwd(), 'public')));
 app.use(express.static(path.join(process.cwd(), 'public')));
+app.use(express.json());
 
 
 // let server: URL = new URL('http://hydra:4444/.well-known/openid-configuration') // Authorization Server's Issuer Identifier
@@ -111,7 +112,7 @@ app.get('/', (req: express.Request, res: express.Response) => {
                     `).join('')}
                  </div>
                  <div class="bucket-container">
-                    <input type="text" id="gcs-bucket" class="bucket-input" placeholder="Enter GCS bucket name" value="gs://sysbio-authpilot-test-bucket">
+                    <input type="text" id="gcs-bucket" class="bucket-input" placeholder="Enter GCS bucket name" value="example-sysbio-output-bucket-8648">
                     <button id="copy-button" class="copy-button">Copy to Bucket</button>
                  </div>`
               : ''
@@ -155,6 +156,7 @@ app.get('/', (req: express.Request, res: express.Response) => {
                 };
 
                 try {
+                    console.log("step 1")
                     const response = await fetch("/transfer", {
                         method: "POST",
                         headers: {
@@ -162,12 +164,12 @@ app.get('/', (req: express.Request, res: express.Response) => {
                         },
                         body: JSON.stringify(requestBody)
                     });
-
+                    console.log("step 2")
+                    const responseData = await response.json();
+                    console.log("step 3")
                     if (!response.ok) {
                         throw new Error(\`HTTP error! Status: \$\{response.status\}\`);
                     }
-
-                    const responseData = await response.json();
                     console.log("Success:", responseData);
                     alert("Files successfully copied!");
                 } catch (error) {
@@ -201,45 +203,23 @@ const AMP_PD_DESTINATION_URI:string = process.env.AMP_PD_DESTINATION_URI!
 const AMP_PD_DRS_SERVER_URI:string = 'http://auth-pilot-drs-server:7200'
 
 app.post('/transfer', async (req: express.Request, res: express.Response) => {
-  console.log(`willy got the transfer req:${JSON.stringify(req.body)}`);
-  console.log(`willy ${req}`)
-  console.log(`willy ${req.body}`)
-})
+  console.log(`transfer request:${JSON.stringify(req.body)}`);
+  const bucket = req.body['bucket']
+  const files = req.body['files']
 
-app.post('/transfer-amp-pd-data', async (req: express.Request, res: express.Response) => {
-  console.log(`getting AMP PD data:${JSON.stringify(req.body)}`);
-  req.session.sourceAmpPdDRSUrl = req.body['amp-pd-data-source']
-  req.session.destinationAmpPdGCSUrl = req.body['amp-pd-data-destination']
-  const {bucket:dest_bucket, path:dest_path} = parseGCSUri(req.session.destinationAmpPdGCSUrl!)
-  const response = await fetch(req.session.sourceAmpPdDRSUrl!, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({'passports':[req.session.passportToken]}),
-  
+  const transferResponse = await fetch("http://auth-pilot-drs-server:7200/transfer", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        'dst_bucket': bucket,
+        'list_of_files': files
+      })
   });
-  const data = await response.json()
-  console.log(data)
-  const AUTH_PILOT_DATA_TRANSFER_URL:string = process.env.AUTH_PILOT_DATA_TRANSFER_URL!
-  const downloadresponse = await fetch(AUTH_PILOT_DATA_TRANSFER_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      'signed_url':data['signed_url'],
-      'destination_bucket': dest_bucket,
-      'destination_path': dest_path
-    })  
-  });
-
-  const dataTransferResult = await downloadresponse.json()
-  console.log(dataTransferResult)
-  req.session.ampPdDataTransferredTo = dataTransferResult['gcs_url']
-  req.session.ampPdDataTransferredMessage = dataTransferResult['message']
-
-  res.redirect('/')
+  const transferResponseJson = await transferResponse.json();
+  console.log("FastAPI response:", transferResponseJson)
+  res.status(200).json({ message: "Ok"});
 })
 
 // Handle login initiation
@@ -285,7 +265,6 @@ app.get('/login', async (req: express.Request, res: express.Response) => {
 
   // now redirect the user to redirectTo.href
   console.log('redirecting to', redirectTo.href)
-
   res.redirect(redirectTo.href);
 });
 
