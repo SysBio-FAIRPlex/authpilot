@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Federated Search API Example</title>
+  <style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    padding: 40px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f4f4f4;
+    font-family: Arial, sans-serif;
+    overflow-y: auto;
+  }
+
+  .container {
+    padding: 30px;
+    background-color: #fff;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    text-align: center;
+    width: 100%;
+    max-width: 500px;
+  }
+
+  h1 {
+    margin-bottom: 20px;
+    font-size: 24px;
+    color: #333;
+  }
+
+  .checkbox-group {
+    margin-bottom: 20px;
+    text-align: left;
+    display: inline-block;
+  }
+
+  label {
+    display: block;
+    margin-bottom: 10x;
+    font-size: 16px;
+  }
+
+  button {
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #40826D;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background-color: #0056b3;
+  }
+
+  #response {
+    margin-top: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-family: monospace;
+    background-color: #f0f0f0;
+    padding: 10px;
+    border-radius: 6px;
+    text-align: left;
+  }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Federated Search API Example</h1>
+    <div class="checkbox-group">
+      <label><input type="checkbox" id="box1"> AMP PD Access</label><br>
+      <label><input type="checkbox" id="box2"> AMP AD Access</label><br>
+    </div>
+    <div>
+      <button onclick="sendSearchRequest()">Submit</button>
+    </div>
+    <div id="response"></div>
+  </div>
+
+  <script>
+    async function sendSearchRequest() {
+      const data = {
+        pd_access: document.getElementById('box1').checked,
+        ad_access: document.getElementById('box2').checked,
+        sql: ""
+      };
+
+      try {
+        const res = await fetch('http://localhost:8000/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        const json = await res.json();
+        document.getElementById('response').textContent = JSON.stringify(json, null, 2);
+      } catch (err) {
+        document.getElementById('response').textContent = 'Error: ' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
