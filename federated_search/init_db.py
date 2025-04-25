@@ -15,9 +15,14 @@ def sync_bigquery_to_sqlite():
     session = SessionLocal()
     bq_client = bigquery.Client()
 
+    # This sql is pretty wild. First, it gets each person's latest diagnosis.
+    # I call this the ranked_conditions (because the diagnosis is a condition_occurrence concept)
+    # Then, it joins that with demographics data available in the person table.
+    # But person table only has concept IDs, so we join with the concept table to get
+    # human readable strings.
     query = """
     WITH ranked_conditions AS (
-      SELECT 
+      SELECT
         co.person_id,
         c.concept_name AS diagnosis_name,
         ROW_NUMBER() OVER (PARTITION BY co.person_id ORDER BY co.condition_start_date DESC) AS rn
@@ -25,7 +30,7 @@ def sync_bigquery_to_sqlite():
       JOIN `data-development-440922.sysbio_synth_omop.concept` c
         ON co.condition_concept_id = c.concept_id
     )
-    SELECT 
+    SELECT
       p.person_id,
       gender.concept_name AS gender,
       p.year_of_birth,
@@ -55,7 +60,7 @@ def sync_bigquery_to_sqlite():
             ethnicity=row["ethnicity"],
             diagnosis_name=row["diagnosis_name"]
         )
-        session.merge(pc)  # inserts or updates by primary key
+        session.merge(pc)
     session.commit()
     session.close()
 
