@@ -1,5 +1,10 @@
 #!/bin/bash
 
-rm test.db
+set -o errexit
+set -o nounset
+
+echo "Wiping local db..."
+rm -f test.db
+echo "Local db wiped."
 python init_db.py
 fastapi dev main.py
