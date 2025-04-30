@@ -48,7 +48,6 @@ async def run_query(body: SearchQueryRequest, db: Session = Depends(get_db)):
         except Exception as e:
             print(f"AD service error: {e}")
             raise
-
     if body.pd_access and body.ad_access:
         return {
             "columns": COLUMNS,
