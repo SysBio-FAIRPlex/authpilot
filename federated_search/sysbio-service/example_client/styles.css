@@ -63,3 +63,9 @@ button:hover {
   border-radius: 6px;
   text-align: left;
 }
+
+#explanation {
+  margin-top: -10px;
+  font-size: 0.95em;
+  color: #555;
+}

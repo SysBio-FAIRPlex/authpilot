@@ -7,15 +7,29 @@
 </head>
 <body>
   <div class="container">
-    <h1>Federated Search API Example</h1>
+    <h1>Federated Search API Demo</h1>
+    <p id="explanation">
+    This is a toy page intended to demonstrate the backend APIs that are being built. The actual frontend capabilities are to provided by other tools like FAIRkit and Workbench. The data returned by the backend is currently all synthetic.</p>
+
     <div class="checkbox-group">
       <label><input type="checkbox" id="box1"> AMP PD Access</label><br>
       <label><input type="checkbox" id="box2"> AMP AD Access</label><br>
     </div>
+
+    <textarea id="sql" placeholder="Enter SQL query..." rows="5" style="width: 100%;"></textarea><br>
+
     <div>
       <button onclick="sendSearchRequest()">Submit</button>
     </div>
-    <div id="response"></div>
+
+    <h2>Federated Sources Contacted</h2>
+    <div id="sources"></div>
+
+    <h2>Combined Results</h2>
+    <div id="table-container"></div>
+
+    <h2>Raw JSON Response</h2>
+    <pre id="response"></pre>
   </div>
 
   <script>
@@ -23,8 +37,16 @@
       const data = {
         pd_access: document.getElementById('box1').checked,
         ad_access: document.getElementById('box2').checked,
-        sql: ""
+        sql: document.getElementById('sql').value
       };
+
+      const sourcesDiv = document.getElementById('sources');
+      const tableContainer = document.getElementById('table-container');
+      const responsePre = document.getElementById('response');
+
+      sourcesDiv.innerHTML = 'Loading...';
+      tableContainer.innerHTML = '';
+      responsePre.textContent = '';
 
       try {
         const res = await fetch('http://localhost:8000/search', {
@@ -34,9 +56,50 @@
         });
 
         const json = await res.json();
-        document.getElementById('response').textContent = JSON.stringify(json, null, 2);
+        responsePre.textContent = JSON.stringify(json, null, 2);
+
+        // Show sources (assumes sysbio-service includes `sources` in its response)
+        if (json.sources) {
+          const sourceRows = [];
+          if (json.sources.pd) sourceRows.push(`AMP PD ✅ (rows: ${json.sources.pd})`);
+          if (json.sources.ad) sourceRows.push(`AMP AD ✅ (rows: ${json.sources.ad})`);
+          sourcesDiv.innerHTML = sourceRows.join('<br>') || 'None';
+        } else {
+          sourcesDiv.innerHTML = 'N/A';
+        }
+
+        // Build results table
+        if (json.columns && json.rows) {
+          const table = document.createElement('table');
+          const thead = document.createElement('thead');
+          const headerRow = document.createElement('tr');
+          json.columns.forEach(col => {
+            const th = document.createElement('th');
+            th.textContent = col;
+            headerRow.appendChild(th);
+          });
+          thead.appendChild(headerRow);
+          table.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+          json.rows.forEach(row => {
+            const tr = document.createElement('tr');
+            row.forEach(cell => {
+              const td = document.createElement('td');
+              td.textContent = cell;
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          });
+          table.appendChild(tbody);
+          tableContainer.appendChild(table);
+        } else {
+          tableContainer.innerHTML = 'No results.';
+        }
+
       } catch (err) {
-        document.getElementById('response').textContent = 'Error: ' + err.message;
+        responsePre.textContent = 'Error: ' + err.message;
+        sourcesDiv.innerHTML = '';
       }
     }
   </script>
