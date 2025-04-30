@@ -11,13 +11,13 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
-2. Create the database with `python init_db.py`
+2. Create the databases with `./init_dbs.sh`
 
 ## Run app
 1. Ensure you have run the setup section above.
-2. Run `fastapi dev main.py`
+2. Run `docker compose up --build -d`
 3. Visit `localhost:8000/docs` for the swagger UI
-4. If at any time you want to reset the database, there is a `reset_and_go.sh` script that will wipe the database and start the app.
+4. If at any time you want to reset the database, stop the containers with `docker compose down`, re-run `./init_dbs.sh` script and rerun `docker compose up --build -d`
 
 ## Run tests
 1. Ensure you have run the setup section above.
