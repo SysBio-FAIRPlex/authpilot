@@ -28,19 +28,25 @@ ROW_LIMIT = 10
 async def run_query(body: SearchQueryRequest, db: Session = Depends(get_db)):
     query = db.query(Person)
 
-    ad_results = query.filter(Person.person_id.between(MAX_PD_ID + 1, MAX_AD_ID)).limit(ROW_LIMIT).all()
     public_results = query.filter(Person.person_id > MAX_AD_ID).limit(ROW_LIMIT).all()
 
-    ad_data = [r.to_row() for r in ad_results]
     public_data = [r.to_row() for r in public_results]
 
     pd_data = []
+    ad_data = []
     async with httpx.AsyncClient() as client:
         try:
             pd_response = await client.post("http://localhost:8001/search", json=body.dict())
             pd_data = pd_response.json()["rows"]
         except Exception as e:
             print(f"PD service error: {e}")
+            raise
+
+        try:
+            ad_response = await client.post("http://localhost:8002/search", json=body.dict())
+            ad_data = ad_response.json()["rows"]
+        except Exception as e:
+            print(f"AD service error: {e}")
             raise
 
     if body.pd_access and body.ad_access:
