@@ -36,18 +36,19 @@ async def run_query(body: SearchQueryRequest, db: Session = Depends(get_db)):
     ad_data = []
     async with httpx.AsyncClient() as client:
         try:
-            pd_response = await client.post("http://localhost:8001/search", json=body.dict())
+            pd_response = await client.post("http://amp-pd:8000/search", json=body.dict())
             pd_data = pd_response.json()["rows"]
         except Exception as e:
             print(f"PD service error: {e}")
             raise
 
         try:
-            ad_response = await client.post("http://localhost:8002/search", json=body.dict())
+            ad_response = await client.post("http://amp-ad:8000/search", json=body.dict())
             ad_data = ad_response.json()["rows"]
         except Exception as e:
             print(f"AD service error: {e}")
             raise
+
     if body.pd_access and body.ad_access:
         return {
             "columns": COLUMNS,

@@ -1,0 +1,36 @@
+services:
+  amp-pd:
+    build:
+      context: ./amp-pd-service
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./pd.db
+    volumes:
+      - ./amp-pd-service:/app
+      - ./amp-pd-service/pd.db:/app/pd.db
+    command: fastapi dev main.py --host 0.0.0.0
+
+  amp-ad:
+    build:
+      context: ./amp-ad-service
+    ports:
+      - "8002:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./ad.db
+    volumes:
+      - ./amp-ad-service:/app
+      - ./amp-ad-service/ad.db:/app/ad.db
+    command: fastapi dev main.py --host 0.0.0.0
+
+  sysbio:
+    build:
+      context: ./sysbio-service
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./sysbio.db
+    volumes:
+      - ./sysbio-service:/app
+      - ./sysbio-service/sysbio.db:/app/sysbio.db
+    command: fastapi dev main.py --host 0.0.0.0
