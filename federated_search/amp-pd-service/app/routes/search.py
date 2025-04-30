@@ -15,11 +15,14 @@ COLUMNS = [
     "diagnosis_name"
 ]
 
+ROW_LIMIT = 10
+
 @router.post("/search", response_model=dict)
 def run_query(body: SearchQueryRequest, db: Session = Depends(get_db)):
     query = db.query(Person)
-
+    db_results = query.limit(ROW_LIMIT).all()
+    results = [r.to_row() for r in db_results]
     return {
         "columns": COLUMNS,
-        "rows": []
+        "rows": results
     }
