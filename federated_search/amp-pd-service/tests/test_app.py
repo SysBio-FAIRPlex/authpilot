@@ -50,7 +50,7 @@ def create_test_db():
 client = TestClient(app)
 
 def test_search_query():
-    # You may want to insert test data here
+    # TODO: Relevant search query
     payload = {"sql": "SELECT * FROM foo"}
     response = client.post("/search", json=payload)
     assert response.status_code == 200
