@@ -27,45 +27,40 @@ ROW_LIMIT = 10
 @router.post("/search", response_model=dict)
 async def run_query(body: SearchQueryRequest, db: Session = Depends(get_db)):
     query = db.query(Person)
-
     public_results = query.filter(Person.person_id > MAX_AD_ID).limit(ROW_LIMIT).all()
-
     public_data = [r.to_row() for r in public_results]
 
     pd_data = []
     ad_data = []
+    sources = {"public": len(public_data)}
+
     async with httpx.AsyncClient() as client:
-        try:
-            pd_response = await client.post("http://amp-pd:8000/search", json=body.dict())
-            pd_data = pd_response.json()["rows"]
-        except Exception as e:
-            print(f"PD service error: {e}")
-            raise
+        if body.pd_access:
+            try:
+                pd_response = await client.post("http://amp-pd:8000/search", json=body.dict())
+                pd_data = pd_response.json()["rows"]
+                sources["pd"] = len(pd_data)
+            except Exception as e:
+                print(f"PD service error: {e}")
+                sources["pd"] = 0
 
-        try:
-            ad_response = await client.post("http://amp-ad:8000/search", json=body.dict())
-            ad_data = ad_response.json()["rows"]
-        except Exception as e:
-            print(f"AD service error: {e}")
-            raise
+        if body.ad_access:
+            try:
+                ad_response = await client.post("http://amp-ad:8000/search", json=body.dict())
+                ad_data = ad_response.json()["rows"]
+                sources["ad"] = len(ad_data)
+            except Exception as e:
+                print(f"AD service error: {e}")
+                sources["ad"] = 0
 
-    if body.pd_access and body.ad_access:
-        return {
-            "columns": COLUMNS,
-            "rows": pd_data + ad_data + public_data
-        }
-    elif body.pd_access:
-        return {
-            "columns": COLUMNS,
-            "rows": pd_data + public_data
-        }
-    elif body.ad_access:
-        return {
-            "columns": COLUMNS,
-            "rows": ad_data + public_data
-        }
-    else:
-        return {
-            "columns": COLUMNS,
-            "rows": public_data
-        }
+    combined_rows = public_data
+    if body.pd_access:
+        combined_rows = pd_data + combined_rows
+    if body.ad_access:
+        combined_rows = ad_data + combined_rows
+
+    return {
+        "columns": COLUMNS,
+        "rows": combined_rows,
+        "sources": sources
+    }
