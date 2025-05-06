@@ -3,7 +3,13 @@ from sqlalchemy.orm import Session
 from app.dependencies import get_db
 from app.models import Person
 from app.schemas import SearchQueryRequest
+from dotenv import load_dotenv
 import httpx
+import os
+
+load_dotenv()
+AMP_PD_URL = os.getenv("AMP_PD_URL")
+AMP_AD_URL = os.getenv("AMP_AD_URL")
 
 router = APIRouter()
 
@@ -37,7 +43,7 @@ async def run_query(body: SearchQueryRequest, db: Session = Depends(get_db)):
     async with httpx.AsyncClient() as client:
         if body.pd_access:
             try:
-                pd_response = await client.post("http://amp-pd:8000/search", json=body.dict())
+                pd_response = await client.post(f"{AMP_PD_URL}/search", json=body.dict())
                 pd_data = pd_response.json()["rows"]
                 sources["pd"] = len(pd_data)
             except Exception as e:
@@ -46,7 +52,7 @@ async def run_query(body: SearchQueryRequest, db: Session = Depends(get_db)):
 
         if body.ad_access:
             try:
-                ad_response = await client.post("http://amp-ad:8000/search", json=body.dict())
+                ad_response = await client.post(f"{AMP_AD_URL}/search", json=body.dict())
                 ad_data = ad_response.json()["rows"]
                 sources["ad"] = len(ad_data)
             except Exception as e:
