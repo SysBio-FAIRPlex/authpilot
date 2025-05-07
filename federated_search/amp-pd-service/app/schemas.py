@@ -1,7 +1,6 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Union, Any, Dict, List, Optional
 
-class SearchQueryRequest(BaseModel):
-    sql: str
-    pd_access: Optional[bool] = None
-    ad_access: Optional[bool] = None
+class SearchRequest(BaseModel):
+    query: str
+    parameters: Optional[Union[List[Any], Dict[str, Any]]] = None
