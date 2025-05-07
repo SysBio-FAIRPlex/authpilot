@@ -16,7 +16,9 @@
       <label><input type="checkbox" id="box2"> AMP AD Access</label><br>
     </div>
 
-    <textarea id="sql" placeholder="Enter SQL query..." rows="5" style="width: 100%;"></textarea><br>
+    <textarea id="sql" placeholder="Enter SQL query..." rows="5" style="width: 100%;">
+SELECT * FROM person LIMIT 10;
+    </textarea><br>
 
     <div>
       <button onclick="sendSearchRequest()">Submit</button>
@@ -71,11 +73,12 @@
         }
 
         // Build results table
-        if (json.columns && json.data) {
+        if (json.data_model && json.data) {
           const table = document.createElement('table');
           const thead = document.createElement('thead');
           const headerRow = document.createElement('tr');
-          json.columns.forEach(col => {
+          const columns = Object.keys(json.data_model.properties)
+          columns.forEach(col => {
             const th = document.createElement('th');
             th.textContent = col;
             headerRow.appendChild(th);
@@ -86,9 +89,9 @@
           const tbody = document.createElement('tbody');
           json.data.forEach(row => {
             const tr = document.createElement('tr');
-            row.forEach(cell => {
+            columns.forEach(col => {
               const td = document.createElement('td');
-              td.textContent = cell;
+              td.textContent = row[col];
               tr.appendChild(td);
             });
             tbody.appendChild(tr);

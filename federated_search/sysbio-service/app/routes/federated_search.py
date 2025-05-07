@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.dependencies import get_db
 from app.models import Person
 from app.schemas import SearchRequest
@@ -12,21 +14,6 @@ AMP_PD_URL = os.getenv("AMP_PD_URL")
 AMP_AD_URL = os.getenv("AMP_AD_URL")
 
 router = APIRouter()
-
-DATA_MODEL = {
-    "type": "object",
-    "properties": {
-        "person_id": {"type": "integer"},
-        "gender": {"type": "string"},
-        "year_of_birth": {"type": "integer"},
-        "race": {"type": "string"},
-        "ethnicity": {"type": "string"},
-        "diagnosis_name": {"type": "string"}
-    },
-    "required": ["person_id", "gender", "year_of_birth", "race", "ethnicity", "diagnosis_name"]
-}
-
-COLUMNS = list(DATA_MODEL["properties"].keys())
 
 # I'm arbitrarily choosing people with ID <= 1500 to be in PD,
 # people with 1500 < ID <= 3000 to be in AD,
@@ -41,8 +28,13 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db)):
     pd_access = request.parameters.get("pd_access", False) if isinstance(request.parameters, dict) else False
     ad_access = request.parameters.get("ad_access", False) if isinstance(request.parameters, dict) else False
 
-    query = db.query(Person).filter(Person.person_id > MAX_AD_ID).limit(ROW_LIMIT)
-    public_data = [r.to_row() for r in query.all()]
+    try:
+        stmt = text(request.query)
+        result = db.execute(stmt, request.parameters or [])
+        rows = result.fetchall()
+        public_data = [dict(row._mapping) for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid SQL: {e}")
 
     pd_data, ad_data = [], []
     sources = {"public": len(public_data)}
@@ -68,8 +60,30 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db)):
 
     all_data = public_data + pd_data + ad_data
 
+    # Generate data_model schema from the first row
+    def infer_type(value):
+        if isinstance(value, int):
+            return "integer"
+        elif isinstance(value, float):
+            return "number"
+        elif isinstance(value, bool):
+            return "boolean"
+        return "string"
+
+    if all_data:
+        first_row = all_data[0]
+        data_model = {
+            "type": "object",
+            "properties": {
+                key: {"type": infer_type(value)} for key, value in first_row.items()
+            },
+            "required": list(first_row.keys())
+        }
+    else:
+        data_model = {"type": "object", "properties": {}}
+
     return {
-        "columns": COLUMNS,
+        "data_model": data_model,
         "data": all_data,
         "sources": sources,
         "pagination": {"next_page_url": None}

@@ -2,6 +2,10 @@ from app.database import Base, engine, SessionLocal
 from app.models import Person
 from google.cloud import bigquery
 
+# I'm arbitrarily choosing 
+# everyone above ID 3000 to be public
+MAX_AD_ID = 3000
+
 def init_db():
     print("Creating database tables...")
     Base.metadata.create_all(bind=engine)
@@ -20,7 +24,7 @@ def sync_bigquery_to_sqlite():
     # Then, it joins that with demographics data available in the person table.
     # But person table only has concept IDs, so we join with the concept table to get
     # human readable strings.
-    query = """
+    query = f"""
     WITH ranked_conditions AS (
       SELECT
         co.person_id,
@@ -47,6 +51,7 @@ def sync_bigquery_to_sqlite():
     LEFT JOIN `data-development-440922.sysbio_synth_omop.concept` ethnicity
       ON p.ethnicity_concept_id = ethnicity.concept_id
     WHERE rc.rn = 1
+    AND p.person_id > {MAX_AD_ID}
     """
 
     result = bq_client.query(query).result()
