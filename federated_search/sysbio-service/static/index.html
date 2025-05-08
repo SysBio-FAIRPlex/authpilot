@@ -35,9 +35,11 @@
   <script>
     async function sendSearchRequest() {
       const data = {
-        pd_access: document.getElementById('box1').checked,
-        ad_access: document.getElementById('box2').checked,
-        sql: document.getElementById('sql').value
+        query: document.getElementById('sql').value,
+        parameters: {
+          pd_access: document.getElementById('box1').checked,
+          ad_access: document.getElementById('box2').checked
+        }
       };
 
       const sourcesDiv = document.getElementById('sources');
@@ -69,7 +71,7 @@
         }
 
         // Build results table
-        if (json.columns && json.rows) {
+        if (json.columns && json.data) {
           const table = document.createElement('table');
           const thead = document.createElement('thead');
           const headerRow = document.createElement('tr');
@@ -82,7 +84,7 @@
           table.appendChild(thead);
 
           const tbody = document.createElement('tbody');
-          json.rows.forEach(row => {
+          json.data.forEach(row => {
             const tr = document.createElement('tr');
             row.forEach(cell => {
               const td = document.createElement('td');
