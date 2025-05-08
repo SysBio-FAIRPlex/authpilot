@@ -1,33 +1,45 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.dependencies import get_db
-from app.models import Person
 from app.schemas import SearchRequest
 
 router = APIRouter()
 
-DATA_MODEL = {
-    "type": "object",
-    "properties": {
-        "person_id": {"type": "integer"},
-        "gender": {"type": "string"},
-        "year_of_birth": {"type": "integer"},
-        "race": {"type": "string"},
-        "ethnicity": {"type": "string"},
-        "diagnosis_name": {"type": "string"}
-    },
-    "required": ["person_id", "gender", "year_of_birth", "race", "ethnicity", "diagnosis_name"]
-}
-
-ROW_LIMIT = 10
-
 @router.post("/search", response_model=dict)
 def run_query(request: SearchRequest, db: Session = Depends(get_db)):
-    query = db.query(Person).limit(ROW_LIMIT)
-    results = [r.to_row() for r in query.all()]
+    try:
+        stmt = text(request.query)
+        result = db.execute(stmt, request.parameters or [])
+        rows = result.fetchall()
+        data = [dict(row._mapping) for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid SQL: {e}")
+
+    # Dynamically generate a data_model based on column names and types
+    def infer_type(value):
+        if isinstance(value, int):
+            return "integer"
+        elif isinstance(value, float):
+            return "number"
+        elif isinstance(value, bool):
+            return "boolean"
+        return "string"
+
+    if data:
+        first_row = data[0]
+        data_model = {
+            "type": "object",
+            "properties": {
+                key: {"type": infer_type(value)} for key, value in first_row.items()
+            },
+            "required": list(first_row.keys())
+        }
+    else:
+        data_model = {"type": "object", "properties": {}}
 
     return {
-        "data_model": DATA_MODEL,
-        "data": results,
+        "data_model": data_model,
+        "data": data,
         "pagination": {"next_page_url": None}
     }
