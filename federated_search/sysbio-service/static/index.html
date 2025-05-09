@@ -67,9 +67,14 @@ SELECT * FROM person LIMIT 10;
 
         // Show sources (assumes sysbio-service includes `sources` in its response)
         if (json.sources) {
-          const sourceRows = [];
-          if (json.sources.pd) sourceRows.push(`AMP PD ✅ (rows: ${json.sources.pd})`);
-          if (json.sources.ad) sourceRows.push(`AMP AD ✅ (rows: ${json.sources.ad})`);
+          const labels = { pd: "AMP PD", ad: "AMP AD" };
+          const sourceRows = Object.entries(labels).map(([key, label]) => {
+            const value = json.sources[key];
+            if (value === 403) return `${label} ❌ Unauthorized`;
+            if (value != null) return `${label} ✅ (rows: ${value})`;
+            return null;
+          }).filter(Boolean);
+
           sourcesDiv.innerHTML = sourceRows.join('<br>') || 'None';
         } else {
           sourcesDiv.innerHTML = 'N/A';

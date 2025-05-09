@@ -32,7 +32,6 @@ ROW_LIMIT = 10
     }
 )
 async def run_query(request: SearchRequest, db: Session = Depends(get_db)):
-    pd_access = request.parameters.get("pd_access", False) if isinstance(request.parameters, dict) else False
     ad_access = request.parameters.get("ad_access", False) if isinstance(request.parameters, dict) else False
 
     try:
@@ -47,23 +46,31 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db)):
     sources = {"public": len(public_data)}
 
     async with httpx.AsyncClient() as client:
-        if pd_access:
-            try:
-                pd_response = await client.post(f"{AMP_PD_URL}/search", json=request.dict())
+        try:
+            pd_response = await client.post(f"{AMP_PD_URL}/search", json=request.dict())
+            if pd_response.status_code == 200:
                 pd_data = pd_response.json()["data"]
                 sources["pd"] = len(pd_data)
-            except Exception as e:
-                print(f"PD service error: {e}")
-                sources["pd"] = 0
+            elif pd_response.status_code == 403:
+                sources["pd"] = 403
+            else:
+                pd_response.raise_for_status()
+        except Exception as e:
+            print(f"PD service error: {e}")
+            sources["pd"] = 0
 
-        if ad_access:
-            try:
-                ad_response = await client.post(f"{AMP_AD_URL}/search", json=request.dict())
+        try:
+            ad_response = await client.post(f"{AMP_AD_URL}/search", json=request.dict())
+            if ad_response.status_code == 200:
                 ad_data = ad_response.json()["data"]
                 sources["ad"] = len(ad_data)
-            except Exception as e:
-                print(f"AD service error: {e}")
-                sources["ad"] = 0
+            elif ad_response.status_code == 403:
+                sources["ad"] = 403
+            else:
+                ad_response.raise_for_status()
+        except Exception as e:
+            print(f"AD service error: {e}")
+            sources["ad"] = 0
 
     all_data = public_data + pd_data + ad_data
 
