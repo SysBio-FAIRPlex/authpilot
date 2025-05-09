@@ -68,8 +68,20 @@ SELECT * FROM person LIMIT 10;
         // Show sources (assumes sysbio-service includes `sources` in its response)
         if (json.sources) {
           const sourceRows = [];
-          if (json.sources.pd) sourceRows.push(`AMP PD ✅ (rows: ${json.sources.pd})`);
-          if (json.sources.ad) sourceRows.push(`AMP AD ✅ (rows: ${json.sources.ad})`);
+          if (json.sources.pd) {
+            if (json.sources.pd == 403) {
+              sourceRows.push(`AMP PD ❌ Unauthorized`);
+            } else { 
+              sourceRows.push(`AMP PD ✅ (rows: ${json.sources.pd})`);
+            }
+          }
+          if (json.sources.ad) {
+            if (json.sources.ad == 403) {
+              sourceRows.push(`AMP AD ❌ Unauthorized`);
+            } else { 
+              sourceRows.push(`AMP AD ✅ (rows: ${json.sources.ad})`);
+            }
+          }
           sourcesDiv.innerHTML = sourceRows.join('<br>') || 'None';
         } else {
           sourcesDiv.innerHTML = 'N/A';
