@@ -28,7 +28,7 @@ h1 {
 
 .checkbox-group {
   margin-bottom: 20px;
-  text-align: left;
+  text-align: center;
   display: inline-block;
 }
 
@@ -64,7 +64,7 @@ button:hover {
   text-align: left;
 }
 
-#explanation {
+.explanation {
   margin-top: -10px;
   font-size: 0.95em;
   color: #555;
