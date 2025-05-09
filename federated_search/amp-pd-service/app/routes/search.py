@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from app.utils.error_utils import error_response
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.dependencies import get_db
@@ -14,7 +15,7 @@ def run_query(request: SearchRequest, db: Session = Depends(get_db)):
         rows = result.fetchall()
         data = [dict(row._mapping) for row in rows]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid SQL: {e}")
+        return error_response(400, title="Invalid SQL", detail=f"Invalid SQL: {e}")
 
     # Dynamically generate a data_model based on column names and types
     def infer_type(value):

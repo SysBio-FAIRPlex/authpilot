@@ -1,9 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.inspection import inspect
+from app.models.error import ErrorResponse
+from app.utils.error_utils import error_response
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.dependencies import get_db
-from app.models import Person
 from app.schemas import SearchRequest
 from dotenv import load_dotenv
 import httpx
@@ -23,7 +23,14 @@ MAX_AD_ID = 3000
 
 ROW_LIMIT = 10
 
-@router.post("/search", response_model=dict)
+@router.post(
+    "/search",
+    response_model=dict,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad request due to invalid input"},
+        500: {"model": ErrorResponse, "description": "Internal server error"},
+    }
+)
 async def run_query(request: SearchRequest, db: Session = Depends(get_db)):
     pd_access = request.parameters.get("pd_access", False) if isinstance(request.parameters, dict) else False
     ad_access = request.parameters.get("ad_access", False) if isinstance(request.parameters, dict) else False
@@ -34,7 +41,7 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db)):
         rows = result.fetchall()
         public_data = [dict(row._mapping) for row in rows]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid SQL: {e}")
+        return error_response(400, title="Invalid SQL", detail=f"Invalid SQL: {e}")
 
     pd_data, ad_data = [], []
     sources = {"public": len(public_data)}

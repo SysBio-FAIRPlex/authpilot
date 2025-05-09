@@ -1,5 +1,5 @@
 from app.database import Base, engine, SessionLocal
-from app.models import Person
+from app.models.person import Person
 from google.cloud import bigquery
 
 # I'm arbitrarily choosing 
