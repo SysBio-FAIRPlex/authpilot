@@ -9,6 +9,9 @@ router = APIRouter()
 
 @router.post("/search", response_model=dict)
 def run_query(request: SearchRequest, db: Session = Depends(get_db)):
+    pd_access = request.parameters.get("pd_access", False) if isinstance(request.parameters, dict) else False
+    if not pd_access:
+        return error_response(403, title="Unauthorized", detail=f"Unauthorized to PD")
     try:
         stmt = text(request.query)
         result = db.execute(stmt, request.parameters or [])
