@@ -1,13 +1,36 @@
-# pytest test_app.py
-# Automated Tests
 import pytest
-from fastapi.testclient import TestClient
+import httpx
+import respx
+from httpx import AsyncClient, ASGITransport
+
 from main import app
 
-client = TestClient(app)
+@pytest.mark.asyncio
+@respx.mock
+async def test_successful_query():
+    respx.post("http://amp-pd:8080/search").mock(
+        return_value=httpx.Response(200, json={"data": [{"person_id": 101}]})
+    )
+    respx.post("http://amp-ad:8080/search").mock(
+        return_value=httpx.Response(200, json={"data": [{"person_id": 2001}]})
+    )
 
-def test_search():
-    response = client.post("/search", json={"sql": "SELECT * FROM harmonized_metadata"})
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.post("/search", json={
+            "query": "SELECT * FROM person WHERE person_id > :min_id",
+            "parameters": {"min_id": 0}
+        })
+
     assert response.status_code == 200
-    data = response.json()
-    assert data == {}
+    body = response.json()
+    assert body["sources"]["pd"] == 1
+    assert body["sources"]["ad"] == 1
+
+@pytest.mark.asyncio
+async def test_invalid_sql():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        res = await ac.post("/search", json={"query": "SELEC WRONG SYNTAX", "parameters": {}})
+    assert res.status_code == 400
+    assert "Invalid SQL" in res.json()["errors"][0]["detail"]

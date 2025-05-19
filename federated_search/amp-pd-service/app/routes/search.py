@@ -1,5 +1,6 @@
 from app.utils.error_utils import error_response
 from fastapi import APIRouter, Depends
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.dependencies import get_db
@@ -17,6 +18,18 @@ def run_query(request: SearchRequest, db: Session = Depends(get_db)):
         result = db.execute(stmt, request.parameters or [])
         rows = result.fetchall()
         data = [dict(row._mapping) for row in rows]
+    except OperationalError as e:
+        if "no such column" in str(e.orig):
+            return error_response(
+                400,
+                title="Invalid Column",
+                detail="The query references a column that is not available."
+            )
+        return error_response(
+            400,
+            title="Operational Error",
+            detail=f"SQL error: {e.orig}"
+        )
     except Exception as e:
         return error_response(400, title="Invalid SQL", detail=f"Invalid SQL: {e}")
 
