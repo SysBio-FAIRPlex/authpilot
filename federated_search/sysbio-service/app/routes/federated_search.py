@@ -47,7 +47,7 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db)):
 
     async with httpx.AsyncClient() as client:
         try:
-            pd_response = await client.post(f"{AMP_PD_URL}/search", json=request.dict())
+            pd_response = await client.post(f"{AMP_PD_URL}/search", json=request.model_dump())
             if pd_response.status_code == 200:
                 pd_data = pd_response.json()["data"]
                 sources["pd"] = len(pd_data)
@@ -60,7 +60,7 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db)):
             sources["pd"] = 0
 
         try:
-            ad_response = await client.post(f"{AMP_AD_URL}/search", json=request.dict())
+            ad_response = await client.post(f"{AMP_AD_URL}/search", json=request.model_dump())
             if ad_response.status_code == 200:
                 ad_data = ad_response.json()["data"]
                 sources["ad"] = len(ad_data)
