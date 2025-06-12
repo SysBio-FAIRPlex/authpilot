@@ -4,6 +4,7 @@ import uuid
 import httpx
 import json
 import os
+import typing
 from urllib.parse import quote
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -11,6 +12,7 @@ import jwt
 from jwcrypto import jwk as jwcryptojwk
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
@@ -19,16 +21,18 @@ import google.auth
 from google.auth import compute_engine
 from google.auth.transport import requests
 
-
+# Todo: Get these from environment variables or a secure vault
+# For simplicity, we use fixed values here.
 PASSPHRASE = "mySecretPassphrase"
-PRIVATE_KEY = None
-PUBLIC_KEY = None
-PRIVATE_PEM = None
-PUBLIC_PEM = None
-PUBLIC_JWK = None
-PRIVATE_PEM_FOR_ENCODE = None
+SALT = b"some_fixed_salt"
+PRIVATE_KEY: rsa.RSAPrivateKey
+PUBLIC_KEY: rsa.RSAPublicKey
+PRIVATE_PEM: bytes
+PUBLIC_PEM: bytes
+PUBLIC_JWK: dict
+PRIVATE_PEM_FOR_ENCODE: PrivateKeyTypes
 
-AMP_PD_GROUPS = []
+AMP_PD_GROUPS: dict
 
 def generate_visa_keys():
     global PRIVATE_KEY, PUBLIC_KEY, PRIVATE_PEM, PUBLIC_PEM, PASSPHRASE, PRIVATE_PEM_FOR_ENCODE
@@ -38,11 +42,10 @@ def generate_visa_keys():
         key_size=2048,
     )
     # Serialize the private key with passphrase-based encryption. Add some salt.
-    salt = b"some_fixed_salt"
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
-        salt=salt,
+        salt=SALT,
         iterations=100000,
         backend=default_backend()
     )
@@ -58,6 +61,8 @@ def generate_visa_keys():
         password=key,
         backend=default_backend()
     )
+    if PRIVATE_PEM_FOR_ENCODE and not isinstance(PRIVATE_PEM_FOR_ENCODE, rsa.RSAPrivateKey):
+        raise ValueError("Failed to load private key from PEM: expecting an RSA private key")
 
     PUBLIC_KEY = PRIVATE_KEY.public_key()
     PUBLIC_PEM = PUBLIC_KEY.public_bytes(
@@ -66,14 +71,15 @@ def generate_visa_keys():
     )
 
 async def get_amp_pd_groups():
-    global AMP_PD_GROUPS
+    auth_pilot_terra_groups_url = os.environ.get('AMP_PD_AUTH_URL')
+    if not auth_pilot_terra_groups_url:
+        raise Exception("AMP_PD_AUTH_URL environment variable is not set")
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            auth_pilot_terra_groups_url = os.environ.get('AMP_PD_AUTH_URL')
-            # auth_pilot_terra_groups_url = "https://auth-pilot-terra-api-1-300966974972.us-central1.run.app/api/group/authpilot"
             headers = {'accept': 'application/json'}
             response = await client.get(auth_pilot_terra_groups_url, headers=headers)
             response.raise_for_status()  # Raise an error for bad responses
+            global AMP_PD_GROUPS
             AMP_PD_GROUPS = response.json()
             print(AMP_PD_GROUPS)
     except httpx.HTTPStatusError as e:
@@ -124,12 +130,17 @@ async def get_public_key(jwks_uri: str, kid: str):
                 detail=f"Failed to get JWKS from {jwks_uri}: {response.status_code} {response.text}"
             )
         jwk_data = response.json()
-        # print(json.dumps(jwk_data["keys"][0], indent=2))
+        public_key = None
         for jwk_key in jwk_data["keys"]:
             if jwk_key["kid"] == kid:
                 key = jwcryptojwk.JWK(**jwk_key)
                 public_key = key.export_to_pem(private_key=False)
                 break
+        if public_key is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Public key with kid {kid} not found in JWKS from {jwks_uri}"
+            )
         print(f'Got public key kid:{kid} from {jwks_uri}')
         return public_key
 
@@ -137,7 +148,6 @@ async def verify_token(token: str):
     hdr = jwt.get_unverified_header(token)
     PUBLIC_KEY = await get_public_key(hdr["jku"], hdr["kid"])
     decoded = jwt.decode(token, PUBLIC_KEY, algorithms=["RS256"], options={"verify_aud":False})
-    # print(decoded)
     return decoded
 
 # Define the request body model
@@ -171,20 +181,22 @@ async def get_visas(request: VisaRequest):
                 "kid": PUBLIC_JWK["kid"]
             }
             tier1_visa_payload = {
-                    "iss": "http://amp-pd.org/",
-                    "sub": email,
-                    "iat": iat,
-                    "exp": exp,
-                    "jti": str(uuid.uuid4()),
-                    "ga4gh_visa_v1": {
-                        "type": "ControlledAccessGrants",
-                        "asserted": iat,
-                        "value": "https://www.amp-pd.org/tier1",
-                        "source": "https://www.amp-pd.org",
-                        "by": "dac"
-                    }
+                "iss": "http://amp-pd.org/",
+                "sub": email,
+                "iat": iat,
+                "exp": exp,
+                "jti": str(uuid.uuid4()),
+                "ga4gh_visa_v1": {
+                    "type": "ControlledAccessGrants",
+                    "asserted": iat,
+                    "value": "https://www.amp-pd.org/tier1",
+                    "source": "https://www.amp-pd.org",
+                    "by": "dac"
                 }
-            tier1_visa = jwt.encode(tier1_visa_payload, PRIVATE_PEM_FOR_ENCODE, algorithm="RS256", headers=headers)
+            }
+            # Create the Visa tokens
+            # Use typing.cast to tell type checker that PRIVATE_PEM_FOR_ENCODE is a RSAPrivateKey
+            tier1_visa = jwt.encode(tier1_visa_payload, typing.cast(rsa.RSAPrivateKey, PRIVATE_PEM_FOR_ENCODE), algorithm="RS256", headers=headers)
             tier2_visa_payload = {
                     "iss": "http://amp-pd.org/",
                     "sub": email,
@@ -199,7 +211,7 @@ async def get_visas(request: VisaRequest):
                         "by": "dac"
                     }
                 }
-            tier2_visa = jwt.encode(tier2_visa_payload, PRIVATE_PEM_FOR_ENCODE, algorithm="RS256", headers=headers)
+            tier2_visa = jwt.encode(tier2_visa_payload, typing.cast(rsa.RSAPrivateKey, PRIVATE_PEM_FOR_ENCODE), algorithm="RS256", headers=headers)
             return {"visa_tokens": [tier1_visa, tier2_visa]}
 
         else:
