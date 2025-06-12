@@ -1,4 +1,6 @@
-# API Service to get group memberships from Terra
+# Auth Pilot Terra API
+
+Service to get group memberships from Terra
 
 ## Cloud Run Deploy
 ```console

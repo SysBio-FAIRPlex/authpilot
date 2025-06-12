@@ -21,7 +21,7 @@ import google.auth
 from google.auth import compute_engine
 from google.auth.transport import requests
 
-# Todo: Get these from environment variables or a secure vault
+# Todo: Get these from environment variables or a secure vault like Google Secret Manager.
 # For simplicity, we use fixed values here.
 PASSPHRASE = "mySecretPassphrase"
 SALT = b"some_fixed_salt"

@@ -21,9 +21,9 @@ FAIRPLEX_PASSPORT_ISS = os.environ.get("FAIRPLEX_PASSPORT_ISS", "https://sysbio-
 
 # Secret key for encoding and decoding JWT (use an environment variable in production)
 ALGORITHM = "RS256"
-HYDRA_PEM_PRIVATE_KEY = None
-HYDRA_PEM_PUBLIC_KEY = None
-HYDRA_KID = None
+HYDRA_PEM_PRIVATE_KEY: bytes
+HYDRA_PEM_PUBLIC_KEY: bytes
+HYDRA_KID: str
 
 async def create_hydra_keyset():
     url = f"{HYDRA_ADMIN_URL}/admin/keys/mykeyset" # use this when running outside docker compose network
@@ -94,7 +94,7 @@ async def lifespan(app: FastAPI):
     key = jwcryptojwk.JWK(**jwk_data)
     global HYDRA_PEM_PRIVATE_KEY, HYDRA_PEM_PUBLIC_KEY, HYDRA_KID
     # Export Hydra private key. We must sign our tokens with the same keys that Hydra uses so that consumers can verify our token signatures with Hydra!
-    HYDRA_PEM_PRIVATE_KEY = key.export_to_pem(private_key=True, password=None) 
+    HYDRA_PEM_PRIVATE_KEY = key.export_to_pem(private_key=True, password=False) 
     HYDRA_PEM_PUBLIC_KEY = key.export_to_pem(private_key=False)
     HYDRA_KID = jwk_data["kid"]
     # print(HYDRA_PEM_PUBLIC_KEY.decode('utf-8'))
@@ -210,11 +210,8 @@ async def token_exchange(
             "jti": jti,
             "ga4gh_passport_v1": amp_pd_visas
         }
-        # print(passport_payload)
         encoded_passport_jwt = jwt.encode(passport_payload, key=HYDRA_PEM_PRIVATE_KEY, algorithm=ALGORITHM, headers=headers)
-        # print(encoded_passport_jwt)
         print(f"Successfully returning passport jti: {passport_payload['jti']}")
-        # Follow 
         return {
             "access_token": encoded_passport_jwt,
             "issued_token_type": "urn:ga4gh:params:oauth:token-type:passport",
