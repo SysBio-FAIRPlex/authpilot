@@ -2,8 +2,6 @@ import pytest
 import httpx
 import respx
 from httpx import AsyncClient, ASGITransport
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
 
 from main import app
 from app.database import Base
@@ -21,22 +19,6 @@ def override_get_db():
         yield db
     finally:
         db.close()
-
-app.dependency_overrides[get_db] = override_get_db
-
-@pytest.fixture(scope="module", autouse=True)
-def create_test_db():
-    Base.metadata.create_all(bind=engine)
-    with engine.begin() as conn:
-        conn.execute(text("""
-        CREATE TABLE person (
-            person_id INTEGER PRIMARY KEY,
-            gender TEXT
-        )"""))
-        conn.execute(text("""
-        INSERT INTO person (person_id, gender) VALUES
-        (100, 'male'), (2000, 'female'), (3500, 'other')
-        """))
 
 @pytest.mark.asyncio
 @respx.mock
