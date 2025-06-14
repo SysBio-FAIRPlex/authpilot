@@ -4,6 +4,13 @@ import respx
 from httpx import AsyncClient, ASGITransport
 
 from main import app
+from app.database import Base
+from app.dependencies import get_db
+
+DATABASE_URL = "sqlite:///:memory:"
+
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 @pytest.mark.asyncio
 @respx.mock
