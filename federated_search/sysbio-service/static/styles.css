@@ -69,3 +69,10 @@ button:hover {
   font-size: 0.95em;
   color: #555;
 }
+
+.json-output {
+  text-align: left;
+  background: #f4f4f4;
+  padding: 0.5em;
+  border-radius: 4px;
+}

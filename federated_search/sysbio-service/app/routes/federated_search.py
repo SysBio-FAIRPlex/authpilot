@@ -1,6 +1,8 @@
 from app.models.error import ErrorResponse
 from app.utils.error_utils import error_response
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.dependencies import get_db
@@ -15,6 +17,10 @@ AMP_AD_URL = os.getenv("AMP_AD_URL")
 
 router = APIRouter()
 
+JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY"))
+ALGORITHM = "HS256"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+
 # I'm arbitrarily choosing people with ID <= 1500 to be in PD,
 # people with 1500 < ID <= 3000 to be in AD,
 # and everyone above 3000 to be public
@@ -22,6 +28,13 @@ MAX_PD_ID = 1500
 MAX_AD_ID = 3000
 
 ROW_LIMIT = 10
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+    except jwt.JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    return payload  # or map to a user model if needed
 
 @router.post(
     "/search",
@@ -31,7 +44,7 @@ ROW_LIMIT = 10
         500: {"model": ErrorResponse, "description": "Internal server error"},
     }
 )
-async def run_query(request: SearchRequest, db: Session = Depends(get_db)):
+async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
     ad_access = request.parameters.get("ad_access", False) if isinstance(request.parameters, dict) else False
 
     try:
