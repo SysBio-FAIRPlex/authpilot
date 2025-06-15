@@ -1,7 +1,8 @@
 import os
 import httpx
 from db import SessionLocal, OAuthState, IssuedToken
-from fastapi import FastAPI, Request, Query, HTTPException, Form
+from fastapi import FastAPI, Request, Query, HTTPException, Form, Depends, status
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from authlib.integrations.starlette_client import OAuth
@@ -18,6 +19,7 @@ JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY"))
 if JWT_SECRET is None:
     raise ValueError("JWT_SECRET or SECRET_KEY must be set in the environment.")
 ALGORITHM = "HS256"
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 load_dotenv()
@@ -45,6 +47,13 @@ oauth.register(
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
     client_kwargs={'scope': 'openid email profile'},
 )
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+    except jwt.JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    return payload
 
 @app.get("/")
 def home(request: Request):
@@ -188,11 +197,7 @@ def load_private_key():
 
 
 @app.get("/userinfo")
-def userinfo(request: Request):
-    user = request.session.get("user")
-    if not user:
-        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
-
+def userinfo(request: Request, user=Depends(get_current_user)):
     now = int(datetime.utcnow().timestamp())
     exp = now + 12 * 3600
 
