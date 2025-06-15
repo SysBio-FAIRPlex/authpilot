@@ -40,6 +40,23 @@ SELECT * FROM person LIMIT 10;
   </div>
 
   <script>
+    function truncateValues(obj, maxLength) {
+      const truncated = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (typeof value === "string" && value.length > maxLength) {
+          truncated[key] = value.slice(0, maxLength) + "...";
+        } else if (Array.isArray(value)) {
+          truncated[key] = value.map(item =>
+            typeof item === "string" && item.length > maxLength
+              ? item.slice(0, maxLength) + "..."
+              : item
+          );
+        } else {
+          truncated[key] = value;
+        }
+      }
+      return truncated;
+    }
     function logout() {
       sessionStorage.removeItem("oauth_state");
       window.location.href = "http://localhost:8000";
@@ -62,9 +79,10 @@ SELECT * FROM person LIMIT 10;
         const userinfoDiv = document.getElementById("userinfo-output");
 
         if (json?.user && json?.access_token) {
+          truncatedJson = truncateValues(json, 35);
           loginDiv.innerHTML = `
             <strong>Authenticated User:</strong>
-            <pre class="json-output">${JSON.stringify(json, null, 2)}</pre>
+            <pre class="json-output">${JSON.stringify(truncatedJson, null, 2)}</pre>
             <br>
             <button onclick="logout()">Logout</button>
           `;
@@ -79,9 +97,10 @@ SELECT * FROM person LIMIT 10;
           });
           if (userinfoRes.ok) {
             const userinfo = await userinfoRes.json();
+            const truncatedUserinfo = truncateValues(userinfo, 50);
             userinfoDiv.innerHTML = `
               <strong>/userinfo:</strong>
-              <pre class="json-output">${JSON.stringify(userinfo, null, 2)}</pre>
+              <pre class="json-output">${JSON.stringify(truncatedUserinfo, null, 2)}</pre>
             `;
           } else {
             userinfoDiv.innerHTML = `<strong>/userinfo:</strong> Error ${userinfoRes.status}`;
