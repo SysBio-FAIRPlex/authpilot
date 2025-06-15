@@ -34,3 +34,12 @@ services:
       - ./sysbio-service:/app
       - ./sysbio-service/sysbio.db:/app/sysbio.db
     command: fastapi dev main.py --host 0.0.0.0 --port 8080
+
+  auth:
+    build:
+      context: ./auth-service
+    ports:
+      - "8003:8080"
+    volumes:
+      - ./auth-service:/app
+    command: fastapi dev main.py --host 0.0.0.0 --port 8080

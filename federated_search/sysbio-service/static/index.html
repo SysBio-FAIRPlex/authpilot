@@ -8,6 +8,8 @@
 <body>
   <div class="container">
     <h1>Federated Search API Demo</h1>
+    <div id="login-status" style="margin-bottom: 1em;"></div>
+    <div id="userinfo-output" style="margin-top: 1em;"></div>
     <div class="checkbox-group">
     <p class="explanation">
     This is a toy page intended to demonstrate the backend APIs that are being built. The actual frontend capabilities are to provided by other tools like FAIRkit and Workbench. The data returned by the backend is currently all synthetic.</p>
@@ -38,6 +40,61 @@ SELECT * FROM person LIMIT 10;
   </div>
 
   <script>
+    function logout() {
+      sessionStorage.removeItem("oauth_state");
+      window.location.href = "http://localhost:8000";
+    }
+    const state = (() => {
+      let s = sessionStorage.getItem("oauth_state");
+      if (!s) {
+        s = crypto.randomUUID();
+        sessionStorage.setItem("oauth_state", s);
+      }
+      return s;
+    })();
+    async function updateLoginButton() {
+      try {
+        const res = await fetch(`http://localhost:8003/session?state=${state}`, {
+          credentials: "include"
+        });
+        const json = await res.json();
+        const loginDiv = document.getElementById("login-status");
+        const userinfoDiv = document.getElementById("userinfo-output");
+
+        if (json?.user && json?.access_token) {
+          loginDiv.innerHTML = `
+            <strong>Authenticated User:</strong>
+            <pre class="json-output">${JSON.stringify(json, null, 2)}</pre>
+            <br>
+            <button onclick="logout()">Logout</button>
+          `;
+
+          // Fetch userinfo
+          const userinfoRes = await fetch("http://localhost:8003/userinfo", {
+            credentials: "include"
+          });
+          if (userinfoRes.ok) {
+            const userinfo = await userinfoRes.json();
+            userinfoDiv.innerHTML = `
+              <strong>/userinfo:</strong>
+              <pre class="json-output">${JSON.stringify(userinfo, null, 2)}</pre>
+            `;
+          } else {
+            userinfoDiv.innerHTML = `<strong>/userinfo:</strong> Error ${userinfoRes.status}`;
+          }
+        } else {
+          loginDiv.innerHTML = `
+            <button onclick="window.location.href='http://localhost:8003/login?state=${state}&redirect_uri=http%3A%2F%2Flocalhost%3A8000'">Login with Google</button>
+          `;
+          userinfoDiv.innerHTML = "";
+        }
+      } catch (err) {
+        console.error("Login status check failed:", err);
+      }
+    }
+
+    updateLoginButton();
+    
     async function sendSearchRequest() {
       const data = {
         query: document.getElementById('sql').value,
