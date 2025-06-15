@@ -71,7 +71,11 @@ SELECT * FROM person LIMIT 10;
 
           // Fetch userinfo
           const userinfoRes = await fetch("http://localhost:8003/userinfo", {
-            credentials: "include"
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${json.access_token}`,
+              "Content-Type": "application/json"
+            }
           });
           if (userinfoRes.ok) {
             const userinfo = await userinfoRes.json();
