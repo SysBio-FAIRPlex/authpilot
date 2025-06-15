@@ -22,3 +22,21 @@ pip install -r requirements.txt
 ## Run tests
 1. Ensure you have run the setup section above.
 2. Run `pytest tests`
+
+## Deploy
+The services are deployed as Cloud Run on GCP.
+
+### Enable APIs
+Enable the following APIs:
+  - Cloud Build
+  - CLoud Run
+
+Grant the Default Compute Service Account the following roles:
+  - Storage Admin
+  - Log Writer
+  - Artifact Registry Administrator
+
+### Create Artifact Repos
+
+### Environment variables
+Set the following variables in .env files:
