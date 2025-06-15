@@ -30,3 +30,6 @@ Thumbs.db
 
 # Generated certs file
 certs/
+
+# Secrets
+private_key.pem
