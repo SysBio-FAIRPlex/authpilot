@@ -45,8 +45,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     }
 )
 async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
-    ad_access = request.parameters.get("ad_access", False) if isinstance(request.parameters, dict) else False
-
     try:
         stmt = text(request.query)
         result = db.execute(stmt, request.parameters or [])
