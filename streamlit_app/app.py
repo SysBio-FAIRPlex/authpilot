@@ -3,6 +3,9 @@ import uuid
 import requests
 from urllib.parse import urlencode
 
+AUTH_URL = "https://auth-344651184654.us-central1.run.app/"
+SYSBIO_SEARCH_URL = "https://sysbio-344651184654.us-central1.run.app/"
+
 # Step 1: Check URL params for existing state
 query_params = st.query_params
 url_state = query_params.get("state", [None])[0]
@@ -18,7 +21,7 @@ else:
 
 # Step 3: Use the state for session lookup
 state = st.session_state.state
-session_url = f"http://localhost:8003/session?state={state}"
+session_url = f"{AUTH_URL}/session?state={state}"
 response = requests.get(session_url)
 
 # Step 4: Display based on session result
@@ -29,7 +32,12 @@ if response.ok and response.json():
     st.success("Access token retrieved!")
     st.json(data)
 else:
-    login_url = f"http://localhost:8003/login?state={state}&redirect_uri=http%3A%2F%2Flocalhost%3A8501"
+    params = {
+        "state": state,
+        "redirect_uri": "http://localhost:8501" # The URL of my streamlit app
+    }
+    encoded_params = urlencode(params)
+    login_url = f"{AUTH_URL}/login?{encoded_params}"
     st.markdown(f"[Login with Google]({login_url})", unsafe_allow_html=True)
 
 if "access_token" in st.session_state:
@@ -45,11 +53,10 @@ if "access_token" in st.session_state:
         }
         try:
             response = requests.post(
-                "http://localhost:8000/search",
+                f"{SYSBIO_SEARCH_URL}/search",
                 headers=headers,
                 json={
-                    "query": "SELECT 1",
-                    "parameters": { "pd_access": True, "ad_access": True }
+                    "query": "SELECT * FROM person LIMIT 10"
                 }
             )
             if response.ok:
