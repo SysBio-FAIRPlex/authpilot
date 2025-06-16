@@ -40,6 +40,9 @@ SELECT * FROM person LIMIT 10;
   </div>
 
   <script>
+    const AUTH_BASE = location.hostname === "localhost"
+      ? "http://localhost:8003"
+      : "https://auth-344651184654.us-central1.run.app";
     let accessToken = null;
     function truncateValues(obj, maxLength) {
       const truncated = {};
@@ -60,7 +63,7 @@ SELECT * FROM person LIMIT 10;
     }
     function logout() {
       sessionStorage.removeItem("oauth_state");
-      window.location.href = "http://localhost:8000";
+      window.location.href = window.location.origin;
     }
     const state = (() => {
       let s = sessionStorage.getItem("oauth_state");
@@ -72,7 +75,7 @@ SELECT * FROM person LIMIT 10;
     })();
     async function updateLoginButton() {
       try {
-        const res = await fetch(`http://localhost:8003/session?state=${state}`, {
+        const res = await fetch(`${AUTH_BASE}/session?state=${state}`, {
           credentials: "include"
         });
         const json = await res.json();
@@ -90,7 +93,7 @@ SELECT * FROM person LIMIT 10;
           accessToken = json.access_token;
 
           // Fetch userinfo
-          const userinfoRes = await fetch("http://localhost:8003/userinfo", {
+          const userinfoRes = await fetch(`${AUTH_BASE}/userinfo`, {
             method: "GET",
             headers: {
               "Authorization": `Bearer ${accessToken}`,
@@ -109,7 +112,8 @@ SELECT * FROM person LIMIT 10;
           }
         } else {
           loginDiv.innerHTML = `
-            <button onclick="window.location.href='http://localhost:8003/login?state=${state}&redirect_uri=http%3A%2F%2Flocalhost%3A8000'">Login with Google</button>
+            <button onclick="logout()">Clear cache and refresh</button>
+            <button onclick="window.location.href='${AUTH_BASE}/login?state=${state}&redirect_uri=${encodeURIComponent(window.location.href)}'">Login with Google</button>
           `;
           userinfoDiv.innerHTML = "";
         }
