@@ -15,14 +15,14 @@ from datetime import datetime, timedelta
 from urllib.parse import urlencode
 import uuid
 
+load_dotenv()
+
 JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY"))
 if JWT_SECRET is None:
     raise ValueError("JWT_SECRET or SECRET_KEY must be set in the environment.")
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
-load_dotenv()
 
 app = FastAPI()
 SECRET_KEY = os.getenv("SECRET_KEY")
