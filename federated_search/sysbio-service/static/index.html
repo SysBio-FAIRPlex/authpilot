@@ -40,6 +40,7 @@ SELECT * FROM person LIMIT 10;
   </div>
 
   <script>
+    let accessToken = null;
     function truncateValues(obj, maxLength) {
       const truncated = {};
       for (const [key, value] of Object.entries(obj)) {
@@ -86,12 +87,13 @@ SELECT * FROM person LIMIT 10;
             <br>
             <button onclick="logout()">Logout</button>
           `;
+          accessToken = json.access_token;
 
           // Fetch userinfo
           const userinfoRes = await fetch("http://localhost:8003/userinfo", {
             method: "GET",
             headers: {
-              "Authorization": `Bearer ${json.access_token}`,
+              "Authorization": `Bearer ${accessToken}`,
               "Content-Type": "application/json"
             }
           });
@@ -138,7 +140,10 @@ SELECT * FROM person LIMIT 10;
       try {
         const res = await fetch('/search', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            "Authorization": `Bearer ${accessToken}`,
+            'Content-Type': 'application/json' 
+          },
           body: JSON.stringify(data)
         });
 
