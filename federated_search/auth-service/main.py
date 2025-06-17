@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
-from jose import jwt
+from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 import uuid
@@ -52,9 +52,10 @@ oauth.register(
 )
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
+    assert JWT_SECRET is not None
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
-    except jwt.JWTError:
+    except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
     return payload
 
@@ -121,6 +122,7 @@ async def callback(request: Request, code: str, state: str):
         "name": user.get("name"),
         "exp": expire_time,
     }
+    assert JWT_SECRET is not None
     access_token = jwt.encode(to_encode, JWT_SECRET, ALGORITHM)
     db = SessionLocal()
     db.add(IssuedToken(

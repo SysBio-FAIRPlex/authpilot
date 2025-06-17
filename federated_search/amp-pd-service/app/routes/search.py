@@ -17,7 +17,10 @@ def run_query(request: SearchRequest, db: Session = Depends(get_db)):
         stmt = text(request.query)
         result = db.execute(stmt, request.parameters or [])
         rows = result.fetchall()
-        data = [dict(row._mapping) for row in rows]
+        data = [
+            {**dict(row._mapping), "source": "AMP PD"}
+            for row in rows
+        ]
     except OperationalError as e:
         if "no such column" in str(e.orig):
             return error_response(

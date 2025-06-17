@@ -2,7 +2,7 @@ from app.models.error import ErrorResponse
 from app.utils.error_utils import error_response
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt
+from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.dependencies import get_db
@@ -30,9 +30,10 @@ MAX_AD_ID = 3000
 ROW_LIMIT = 10
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
+    assert JWT_SECRET is not None
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
-    except jwt.JWTError:
+    except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
     return payload  # or map to a user model if needed
 
@@ -49,7 +50,10 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
         stmt = text(request.query)
         result = db.execute(stmt, request.parameters or [])
         rows = result.fetchall()
-        public_data = [dict(row._mapping) for row in rows]
+        public_data = [
+            {**dict(row._mapping), "source": "public"}
+            for row in rows
+        ]
     except Exception as e:
         return error_response(400, title="Invalid SQL", detail=f"Invalid SQL: {e}")
 
