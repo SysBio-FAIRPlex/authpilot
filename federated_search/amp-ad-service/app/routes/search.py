@@ -16,7 +16,10 @@ def run_query(request: SearchRequest, db: Session = Depends(get_db)):
         stmt = text(request.query)
         result = db.execute(stmt, request.parameters or [])
         rows = result.fetchall()
-        data = [dict(row._mapping) for row in rows]
+        data = [
+            {**dict(row._mapping), "source": "AMP AD"}
+            for row in rows
+        ]
     except Exception as e:
         return error_response(400, title="Invalid SQL", detail=f"Invalid SQL: {e}")
 

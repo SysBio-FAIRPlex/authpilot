@@ -17,7 +17,7 @@ body {
   box-shadow: 0 0 10px rgba(0,0,0,0.1);
   text-align: center;
   width: 100%;
-  max-width: 500px;
+  max-width: 750px;
 }
 
 h1 {
@@ -75,4 +75,24 @@ button:hover {
   background: #f4f4f4;
   padding: 0.5em;
   border-radius: 4px;
+}
+
+#table-container {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}
+
+th {
+  background-color: #f0f0f0;
 }
