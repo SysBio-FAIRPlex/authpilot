@@ -1,33 +1,24 @@
-from app.models.error import ErrorResponse
-from app.utils.error_utils import error_response
+import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
 from sqlalchemy.orm import Session
 from sqlalchemy import text
+from app.models.error import ErrorResponse
+from app.utils.error_utils import error_response
 from app.dependencies import get_db
 from app.schemas import SearchRequest
-from dotenv import load_dotenv
+from jose import jwt, JWTError
+from typing import Dict, Any
 import httpx
 import os
 
-load_dotenv()
-AMP_PD_URL = os.getenv("AMP_PD_URL")
-AMP_AD_URL = os.getenv("AMP_AD_URL")
-
 router = APIRouter()
-
 JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY"))
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
-# I'm arbitrarily choosing people with ID <= 1500 to be in PD,
-# people with 1500 < ID <= 3000 to be in AD,
-# and everyone above 3000 to be public
-MAX_PD_ID = 1500
-MAX_AD_ID = 3000
-
-ROW_LIMIT = 10
+AMP_PD_URL = os.getenv("AMP_PD_URL")
+AMP_AD_URL = os.getenv("AMP_AD_URL")
 
 def get_current_user(token: str = Depends(oauth2_scheme)):
     assert JWT_SECRET is not None
@@ -35,7 +26,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
-    return payload  # or map to a user model if needed
+    return payload
 
 @router.post(
     "/search",
@@ -46,9 +37,28 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     }
 )
 async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    # Prepare parameter dict
+    if isinstance(request.parameters, dict):
+        params: Dict[str, Any] = request.parameters.copy()
+    elif request.parameters is None:
+        params = {}
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Only named parameters (dict[str, Any]) are supported for pagination"
+        )
+
+    query_base = request.query.strip().rstrip(';')
+    pagination_supported = not re.search(r'\blimit\b', query_base, flags=re.IGNORECASE)
+
+    if pagination_supported:
+        query_base += " LIMIT :limit OFFSET :offset"
+        params["limit"] = request.limit or 10
+        params["offset"] = request.offset or 0
+
     try:
-        stmt = text(request.query)
-        result = db.execute(stmt, request.parameters or [])
+        stmt = text(query_base)
+        result = db.execute(stmt, params)
         rows = result.fetchall()
         public_data = [
             {**dict(row._mapping), "source": "public"}
@@ -89,7 +99,6 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
 
     all_data = public_data + pd_data + ad_data
 
-    # Generate data_model schema from the first row
     def infer_type(value):
         if isinstance(value, int):
             return "integer"
@@ -111,9 +120,19 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
     else:
         data_model = {"type": "object", "properties": {}}
 
+    # Build next_page_url only if pagination was applied
+    next_page_url = None
+    if pagination_supported and len(all_data) == (request.limit or 10):
+        offset = request.offset or 0
+        limit = request.limit or 10
+        next_offset = offset + limit
+        next_page_url = f"/search?offset={next_offset}&limit={limit}"
+
     return {
         "data_model": data_model,
         "data": all_data,
         "sources": sources,
-        "pagination": {"next_page_url": None}
+        "pagination": {
+            "next_page_url": next_page_url
+        }
     }
