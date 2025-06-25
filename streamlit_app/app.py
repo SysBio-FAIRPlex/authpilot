@@ -6,9 +6,12 @@ from urllib.parse import urlencode
 AUTH_URL = "https://auth-344651184654.us-central1.run.app/"
 SYSBIO_SEARCH_URL = "https://sysbio-344651184654.us-central1.run.app/"
 
+# AUTH_URL = "http://localhost:8003"
+# SYSBIO_SEARCH_URL = "http://localhost:8000"
+
 # Step 1: Check URL params for existing state
 query_params = st.query_params
-url_state = query_params.get("state", [None])[0]
+url_state = query_params.get("state", None)
 
 # Step 2: Use the state from URL if available, else create and update URL
 if url_state:
@@ -56,7 +59,14 @@ if "access_token" in st.session_state:
                 f"{SYSBIO_SEARCH_URL}/search",
                 headers=headers,
                 json={
-                    "query": "SELECT * FROM person LIMIT 10"
+                    "query": "SELECT * FROM person LIMIT 10",
+                    # NOTE - These parameters are inteded for DEMO PURPOSES ONLY
+                    # In reality, the service will automatically check the credentials of the user
+                    # via ga4gh passport/visa to see if they have access to the datasets.
+                    "parameters": {
+                        "pd_access": True,
+                        "ad_access": True
+                    }
                 }
             )
             if response.ok:
