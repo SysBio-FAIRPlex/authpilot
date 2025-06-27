@@ -41,7 +41,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-config = Config('.env', environ=os.environ)
+config = Config('.env')
 oauth = OAuth(config)
 oauth.register(
     name='google',
