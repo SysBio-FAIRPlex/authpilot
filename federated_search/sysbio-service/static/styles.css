@@ -96,3 +96,9 @@ th, td {
 th {
   background-color: #f0f0f0;
 }
+
+.restricted-cell {
+  background-color: #fff4f4;
+  color: #aa0000;
+  font-style: italic;
+}

@@ -28,6 +28,8 @@ services:
       context: ./sysbio-service
     ports:
       - "8000:8080"
+    env_file:
+      - ./sysbio-service/.env
     environment:
       - DATABASE_URL=sqlite:///./sysbio.db
     volumes:
