@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Federated Search API Example</title>
   <link rel="stylesheet" href="/static/styles.css">
+  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
 </head>
 <body>
   <div class="container">
@@ -184,11 +185,31 @@ SELECT * FROM person LIMIT 10;
           table.appendChild(thead);
 
           const tbody = document.createElement('tbody');
+          // Sort the data alphabetically by 'source'
+          json.data.sort((a, b) => {
+            const sourceA = (a.source || '').toUpperCase();
+            const sourceB = (b.source || '').toUpperCase();
+            return sourceA.localeCompare(sourceB);
+          });
+
+          // Build the table rows
+          const restrictions = json.restricted_fields || {};
           json.data.forEach(row => {
             const tr = document.createElement('tr');
             columns.forEach(col => {
               const td = document.createElement('td');
-              td.textContent = row[col];
+
+              if (row[col] !== undefined && row[col] !== null) {
+                td.textContent = row[col];
+              } else if (restrictions[col]) {
+                const reasons = Array.isArray(restrictions[col])
+                  ? restrictions[col].map(r => `${r.reason}`).join('; ')
+                  : restrictions[col];
+                td.textContent = `<PROTECTED> ${reasons}`;
+                td.classList.add('restricted-cell');
+              } else {
+                td.textContent = '';
+              }
               tr.appendChild(td);
             });
             tbody.appendChild(tr);

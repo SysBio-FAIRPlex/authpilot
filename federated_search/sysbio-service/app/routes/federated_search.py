@@ -68,13 +68,17 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
         return error_response(400, title="Invalid SQL", detail=f"Invalid SQL: {e}")
 
     pd_data, ad_data = [], []
+    pd_restricted = {}
     sources = {"public": len(public_data)}
 
     async with httpx.AsyncClient() as client:
         try:
             pd_response = await client.post(f"{AMP_PD_URL}/search", json=request.model_dump())
             if pd_response.status_code == 200:
-                pd_data = pd_response.json()["data"]
+                pd_json = pd_response.json()
+                pd_data = pd_json.get("data", [])
+                pd_restricted = pd_json.get("restricted_fields", {})
+
                 sources["pd"] = len(pd_data)
             elif pd_response.status_code == 403:
                 sources["pd"] = 403
@@ -98,6 +102,12 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
             sources["ad"] = 0
 
     all_data = public_data + pd_data + ad_data
+
+    restricted_fields = {}
+    if pd_restricted:
+        for field, reason in pd_restricted.items():
+            restricted_fields.setdefault(field, []).append({"source": "pd", "reason": reason})
+
 
     def infer_type(value):
         if isinstance(value, int):
@@ -132,6 +142,7 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
         "data_model": data_model,
         "data": all_data,
         "sources": sources,
+        "restricted_fields": restricted_fields,
         "pagination": {
             "next_page_url": next_page_url
         }

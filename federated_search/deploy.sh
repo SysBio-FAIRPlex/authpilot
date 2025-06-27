@@ -41,7 +41,8 @@ deploy_sysbio() {
     --platform managed \
     --region us-central1 \
     --allow-unauthenticated \
-    --set-env-vars "AMP_PD_URL=https://amp-pd-344651184654.us-central1.run.app,AMP_AD_URL=https://amp-ad-344651184654.us-central1.run.app,DATABASE_URL=sqlite:///./sysbio.db"
+    --set-env-vars "AMP_PD_URL=https://amp-pd-344651184654.us-central1.run.app,AMP_AD_URL=https://amp-ad-344651184654.us-central1.run.app,DATABASE_URL=sqlite:///./sysbio.db"\
+    --update-secrets JWT_SECRET=jwt-secret:latest
 }
 
 deploy_auth() {

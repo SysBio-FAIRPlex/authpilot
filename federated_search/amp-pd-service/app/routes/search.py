@@ -13,14 +13,15 @@ def run_query(request: SearchRequest, db: Session = Depends(get_db)):
     pd_access = request.parameters.get("pd_access", False) if isinstance(request.parameters, dict) else False
     if not pd_access:
         return error_response(403, title="Unauthorized", detail=f"Unauthorized to PD")
+
+    restricted_fields = {
+        "year_of_birth": "Restricted to approved researchers"
+    }
+
     try:
         stmt = text(request.query)
         result = db.execute(stmt, request.parameters or [])
         rows = result.fetchall()
-        data = [
-            {**dict(row._mapping), "source": "AMP PD"}
-            for row in rows
-        ]
     except OperationalError as e:
         if "no such column" in str(e.orig):
             return error_response(
@@ -36,7 +37,16 @@ def run_query(request: SearchRequest, db: Session = Depends(get_db)):
     except Exception as e:
         return error_response(400, title="Invalid SQL", detail=f"Invalid SQL: {e}")
 
-    # Dynamically generate a data_model based on column names and types
+    # Remove restricted fields from the data rows
+    data = []
+    for row in rows:
+        row_dict = dict(row._mapping)
+        for field in restricted_fields:
+            row_dict.pop(field, None)
+        row_dict["source"] = "AMP PD"
+        data.append(row_dict)
+
+    # Build data_model from filtered data
     def infer_type(value):
         if isinstance(value, int):
             return "integer"
@@ -61,5 +71,6 @@ def run_query(request: SearchRequest, db: Session = Depends(get_db)):
     return {
         "data_model": data_model,
         "data": data,
+        "restricted_fields": restricted_fields,
         "pagination": {"next_page_url": None}
     }
