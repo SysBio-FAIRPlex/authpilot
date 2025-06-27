@@ -1,12 +1,13 @@
 import os
 import httpx
-from db import SessionLocal, OAuthState, IssuedToken
+from db import OAuthState, IssuedToken, get_db
 from fastapi import FastAPI, Request, Query, HTTPException, Form, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
 from authlib.integrations.starlette_client import OAuth
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 from starlette.config import Config
 from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
@@ -70,17 +71,15 @@ def home(request: Request):
 @app.get("/login")
 def login(
     redirect_uri: str = Query(description="Client redirect URI"),
-    state: str = Query()
+    state: str = Query(),
+    db: Session = Depends(get_db)
 ):
-    db = SessionLocal()
     existing = db.query(OAuthState).filter_by(state=state).first()
     if existing:
-        db.close()
         raise HTTPException(status_code=400, detail=f"State {state} already exists - use a different state.")
 
     db.add(OAuthState(state=state, redirect_uri=redirect_uri))
     db.commit()
-    db.close()
 
     params = {
         "response_type": "code",
@@ -94,15 +93,13 @@ def login(
     return RedirectResponse(url)
 
 @app.get("/callback")
-async def callback(request: Request, code: str, state: str):
-    db = SessionLocal()
+async def callback(request: Request, code: str, state: str, db: Session = Depends(get_db)):
     state_entry = db.query(OAuthState).filter_by(state=state).first()
     if not state_entry:
         raise HTTPException(400, "Invalid or expired state")
     redirect_uri = state_entry.redirect_uri
     db.delete(state_entry)
     db.commit()
-    db.close()
     async with httpx.AsyncClient() as client:
         token_res = await client.post(
             "https://oauth2.googleapis.com/token",
@@ -129,7 +126,6 @@ async def callback(request: Request, code: str, state: str):
     }
     assert JWT_SECRET is not None
     access_token = jwt.encode(to_encode, JWT_SECRET, ALGORITHM)
-    db = SessionLocal()
     db.add(IssuedToken(
         state=state,
         access_token=access_token,
@@ -139,7 +135,6 @@ async def callback(request: Request, code: str, state: str):
         expires_at=expire_time
     ))
     db.commit()
-    db.close()
     return RedirectResponse(f"{redirect_uri}")
 
 @app.get("/passport")
@@ -150,8 +145,7 @@ def show_passport(request: Request):
     return {"message": "Authenticated user", "user": user}
 
 @app.get("/session")
-def session_info(state: str):
-    db = SessionLocal()
+def session_info(state: str, db: Session = Depends(get_db)):
     token = db.query(IssuedToken).filter_by(state=state).first()
     if token:
         user = {
@@ -163,6 +157,8 @@ def session_info(state: str):
             "token_type": "bearer",
             "user": user,
         }
+    else:
+        raise HTTPException(status_code=404, detail="Session not found")
 
 class TokenRequest(BaseModel):
     code: str
