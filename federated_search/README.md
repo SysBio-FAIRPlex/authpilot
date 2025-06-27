@@ -6,7 +6,7 @@ Goal: Create a unified API that enables client tools (like FAIRkit) to query dat
 
 ## Setup
 1. Create a python virtual environment for dependencies.
-```
+```sh
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
@@ -15,9 +15,9 @@ pip install -r requirements.txt
 
 ## Run app
 1. Ensure you have run the setup section above.
-2. Run `docker compose up --build -d`
+2. Run `docker compose up --build --force-recreate -d`
 3. Visit `localhost:8000/docs` for the swagger UI
-4. If at any time you want to reset the database, stop the containers with `docker compose down`, re-run `./init_dbs.sh` script and rerun `docker compose up --build -d`
+4. If at any time you want to reset the database, stop the containers with `docker compose down`, re-run `./init_dbs.sh` script and rerun `docker compose up --build --force-recreate -d`
 
 ## Run tests
 1. Ensure you have run the setup section above.
@@ -29,14 +29,24 @@ The services are deployed as Cloud Run on GCP.
 ### Enable APIs
 Enable the following APIs:
   - Cloud Build
-  - CLoud Run
+  - Cloud Run
+  - Secret Manager
 
 Grant the Default Compute Service Account the following roles:
   - Storage Admin
   - Log Writer
   - Artifact Registry Administrator
+  - Secret Manager Secret Accessor
 
 ### Create Artifact Repos
 
 ### Environment variables
 Set the following variables in .env files:
+
+### Deploy script
+Run the `deploy.sh` script to deploy to Google Cloud Run. The script takes parameters for which services to deploy.
+For example, to deploy all services, run the command
+
+```sh
+./deploy.sh all
+```
