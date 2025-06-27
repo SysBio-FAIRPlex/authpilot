@@ -73,6 +73,11 @@ def login(
     state: str = Query()
 ):
     db = SessionLocal()
+    existing = db.query(OAuthState).filter_by(state=state).first()
+    if existing:
+        db.close()
+        raise HTTPException(status_code=400, detail=f"State {state} already exists - use a different state.")
+
     db.add(OAuthState(state=state, redirect_uri=redirect_uri))
     db.commit()
     db.close()
