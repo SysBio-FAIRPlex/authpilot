@@ -3,9 +3,11 @@ import os
 import sys
 from fastapi.testclient import TestClient
 
+# This adds the parent directory to path so that imports can work from anywhere
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from main import app, SessionLocal, OAuthState
+from main import app
+from db import SessionLocal, OAuthState
 
 
 client = TestClient(app)
