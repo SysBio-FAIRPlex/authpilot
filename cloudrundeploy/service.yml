@@ -21,7 +21,7 @@ spec:
         # Below requires fairplex-client-app container to spin up before nginx container,
         # which depends on the fairplex-client-app container.
         # https://cloud.google.com/run/docs/configuring/containers#container-ordering
-        run.googleapis.com/container-dependencies: "{nginx: [fairplex-client-app, hydra, kratos, auth-pilot-data-transfer], fairplex-token-exchange: [hydra]}"
+        run.googleapis.com/container-dependencies: "{nginx: [fairplex-client-app, hydra, kratos, auth-pilot-data-transfer], fairplex-client-app: [hydra], fairplex-token-exchange: [hydra]}"
         # Connect Cloud SQL instance
         run.googleapis.com/cloudsql-instances: "auth-spike-445014:us-central1:postgres-fairplex-authpilot"
         # Execution environment Gen1 for fast cold starts
@@ -105,7 +105,7 @@ spec:
           startupProbe:
             timeoutSeconds: 240
             periodSeconds: 240
-            failureThreshold: 1
+            failureThreshold: 3
             tcpSocket:
               port: 8888
 
@@ -122,16 +122,19 @@ spec:
             - "/bin/sh"
             - "-c"
           args: "hydra migrate sql -c /etc/config/hydra/hydra-config.yml -e -y \
-            && hydra serve all -c /etc/config/hydra/hydra-config.yml --dev \
-            && (hydra delete client FAIRplex --endpoint https://fairplex-authpilot-300966974972.us-central1.run.app/hydra-admin || true) \
-            && hydra create client --endpoint https://fairplex-authpilot-300966974972.us-central1.run.app/hydra-admin \
-                --id FAIRplex --seceret secret \
-                --grant-type authorization_code,refresh_token \
-                --response-type code,id_token \
-                --format json \
-                --scope openid,profile,email,ga4gh_passport_v1 \
-                --token-endpoint-auth-method client_secret_post \
-                --redirect-uri https://fairplex-authpilot-300966974972.us-central1.run.app/callback"
+            && (hydra serve all -c /etc/config/hydra/hydra-config.yml --dev) & \
+            sleep 5 \
+            && (hydra delete client FAIRplex -e http://localhost:4445 || true) \
+            && hydra create client -e http://localhost:4445 \
+              --id FAIRplex --secret secret \
+              --grant-type authorization_code,refresh_token \
+              --response-type code,id_token \
+              --format json \
+              --scope openid,profile,email,ga4gh_passport_v1 \
+              --token-endpoint-auth-method client_secret_post \
+              --redirect-uri https://fairplex-authpilot-300966974972.us-central1.run.app/callback \
+            && hydra list clients -e http://localhost:4445 \
+            && tail -f /dev/null"
           startupProbe:
             timeoutSeconds: 240
             periodSeconds: 240
@@ -168,8 +171,8 @@ spec:
           env:
             - name: MY_PORT
               value: "7000"
-            # We can use "localhost" here since GA4GH Passport token exchange is performed over loopback network interface 
-            # between fairplex-client-app and fairplex-token-exchange. This avoids unnecessary external network traffic.
+            # We can use "localhost" here since all containers in the same service share the same network namespace.
+            # https://cloud.google.com/run/docs/configuring/containers#container-networking
             - name: HYDRA_URL
               value: http://localhost:4444
             - name: HYDRA_ADMIN_URL
