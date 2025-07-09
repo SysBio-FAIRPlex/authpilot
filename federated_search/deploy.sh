@@ -2,6 +2,11 @@
 
 set -o errexit
 
+if [[ $# -eq 0 ]]; then
+  echo "Usage: ./deploy.sh [pd] [ad] [sysbio] [auth] [all]"
+  exit 1
+fi
+
 PROJECT_ID="sysbio-fed-search-dev"
 gcloud config set project "${PROJECT_ID}"
 
@@ -57,11 +62,6 @@ deploy_auth() {
     --allow-unauthenticated \
     --set-env-vars "REDIRECT_URI=https://auth-344651184654.us-central1.run.app/callback"
 }
-
-if [[ $# -eq 0 ]]; then
-  echo "Usage: ./deploy.sh [pd] [ad] [sysbio] [auth] [all]"
-  exit 1
-fi
 
 for service in "$@"; do
   case "$service" in

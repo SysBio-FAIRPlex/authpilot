@@ -9,31 +9,44 @@ SYSBIO_SEARCH_URL = "https://sysbio-344651184654.us-central1.run.app/"
 # AUTH_URL = "http://localhost:8003"
 # SYSBIO_SEARCH_URL = "http://localhost:8000"
 
-# Step 1: Check URL params for existing state
+# Step 1: # Get the authorization code from the URL
 query_params = st.query_params
-url_state = query_params.get("state", None)
+auth_code = query_params.get("code")
 
-# Step 2: Use the state from URL if available, else create and update URL
-if url_state:
-    st.session_state.state = url_state
-else:
-    st.session_state.state = str(uuid.uuid4())
-    new_url = f"?{urlencode({'state': st.session_state.state})}"
-    st.query_params = { "state": st.session_state.state }
-    st.rerun()  # Force reload with updated URL
+# Step 2: If state is lost from session, recover it from the URL
+if "state" not in st.session_state:
+    # Check if we are returning from a redirect with the state in the URL
+    if "state" in query_params:
+        st.session_state.state = query_params["state"]
+    # Otherwise, it's a new session, so create a new state
+    else:
+        st.session_state.state = str(uuid.uuid4())
+
+# Always sync the URL to match the session state, unless we just arrived from redirect
+if not auth_code:
+    st.query_params["state"] = st.session_state.state
+
 
 # Step 3: Use the state for session lookup
 state = st.session_state.state
-session_url = f"{AUTH_URL}/session?state={state}"
-response = requests.get(session_url)
+returned_state = query_params.get("state")
 
-# Step 4: Display based on session result
-if response.ok and response.json():
-    data = response.json()
-    access_token = data.get("access_token")
-    st.session_state.access_token = access_token
-    st.success("Access token retrieved!")
-    st.json(data)
+# Step 4: Check for an access token or attempt to get one
+if auth_code:
+    # Security check: The state from the URL must match the one in our session
+    if returned_state != state:
+        st.error(f"STATE mismatch. Authentication failed. Please try again.")
+        st.write(f"Expected: `{state}`")
+        st.write(f"Received: `{returned_state}`")
+        st.stop()
+    session_url = f"{AUTH_URL}/session?state={state}"
+    response = requests.get(session_url)
+    if response.ok and response.json():
+        data = response.json()
+        access_token = data.get("access_token")
+        st.session_state.access_token = access_token
+        st.success("Access token retrieved!")
+        st.json(data)
 else:
     params = {
         "state": state,
@@ -81,5 +94,5 @@ if st.button("Logout"):
     for key in ["access_token", "state"]:
         if key in st.session_state:
             del st.session_state[key]
-    st.query_params = {}  # Clear state from URL
+    st.query_params.clear()  # Clear state from URL
     st.rerun()

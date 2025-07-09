@@ -135,6 +135,11 @@ async def callback(request: Request, code: str, state: str, db: Session = Depend
         expires_at=expire_time
     ))
     db.commit()
+    params = {
+        "state": state,
+        "code": code
+    }
+    redirect_uri = f"{redirect_uri}?{urlencode(params)}"
     return RedirectResponse(f"{redirect_uri}")
 
 @app.get("/passport")
