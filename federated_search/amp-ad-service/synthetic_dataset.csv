@@ -1,0 +1,11 @@
+dataset,ID,status,treatment,sex,age_at_sampling,age_at_death,APOE4_compund_genotype,time_from_baseline,repository_link
+dataset2,dataset2_ID9628,Diabetes,control,female,51,55,2,5.4,s3://bucket-study1/file_0.dat
+dataset2,dataset2_ID3038,Diabetes,control,male,60,55,0,4.6,s3://bucket-study1/file_1.dat
+dataset2,dataset2_ID7079,Alzheimer's,placebo,male,49,51,1,9.9,s3://bucket-study1/file_2.dat
+dataset2,dataset2_ID7112,Parkinson's,placebo,male,63,61,0,4.1,s3://bucket-study3/file_3.dat
+dataset2,dataset2_ID5848,control,control,female,42,64,0,2.4,s3://bucket-study1/file_4.dat
+dataset2,dataset2_ID7056,control,placebo,female,68,60,0,6.3,s3://bucket-study3/file_5.dat
+dataset2,dataset2_ID3455,control,placebo,female,44,59,0,7.4,s3://bucket-study1/file_6.dat
+dataset2,dataset2_ID2580,Alzheimer's,control,female,57,66,1,9.6,gs://cloud-bucket-study2/file_7.dat
+dataset2,dataset2_ID9034,Alzheimer's,placebo,female,53,57,0,5.3,s3://bucket-study1/file_8.dat
+dataset2,dataset2_ID8275,Diabetes,experimental,female,66,53,2,3.4,s3://bucket-study1/file_9.dat

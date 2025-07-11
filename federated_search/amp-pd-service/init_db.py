@@ -1,5 +1,7 @@
+import csv
 from app.database import Base, engine, SessionLocal
 from app.models.person import Person
+from app.models.synthetic_dataset import SyntheticDataset
 from google.cloud import bigquery
 
 # I'm arbitrarily choosing people with ID <= 1500 to be in PD
@@ -13,6 +15,10 @@ def init_db():
     print("Querying BQ for initial data...")
     sync_bigquery_to_sqlite()
     print("BigQuery data loaded into SQLite.")
+
+    print("Loading Synthetic Dataset from CSV...")
+    load_synthetic_data_to_sqlite()
+    print("Synthetic CSV data loaded into SQLite")
 
 def sync_bigquery_to_sqlite():
     session = SessionLocal()
@@ -67,6 +73,25 @@ def sync_bigquery_to_sqlite():
         session.merge(pc)
     session.commit()
     session.close()
+
+def load_synthetic_data_to_sqlite():
+  session = SessionLocal()
+  with open("synthetic_dataset.csv", newline='', encoding='utf-8') as csvfile:
+      reader = csv.DictReader(csvfile)
+      for row in reader:
+          dataset = SyntheticDataset(
+              ID=row["ID"],
+              dataset=row["dataset"],
+              status=row["status"],
+              sex=row["sex"],
+              age_at_sampling=int(row["age_at_sampling"]) if row["age_at_sampling"] else None,
+              age_at_death=int(row["age_at_death"]) if row["age_at_death"] else None,
+              APOE4_compund_genotype=int(row["APOE4_compund_genotype"]) if row["APOE4_compund_genotype"] else None,
+              time_from_baseline=float(row["time_from_baseline"]) if row["time_from_baseline"] else None,
+              repository_link=row["repository_link"]
+          )
+          session.add(dataset)
+      session.commit()
 
 if __name__ == "__main__":
     init_db()

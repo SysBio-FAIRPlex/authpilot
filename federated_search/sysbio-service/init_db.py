@@ -1,5 +1,6 @@
 from app.database import Base, engine, SessionLocal
 from app.models.person import Person
+from app.models.synthetic_dataset import SyntheticDataset # Import needed to create empty table
 from google.cloud import bigquery
 
 # I'm arbitrarily choosing 
