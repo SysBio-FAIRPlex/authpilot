@@ -24,8 +24,8 @@ selfservice:
         providers:
           - id: google # this is `<provider-id>` in the Authorization callback URL. DO NOT CHANGE IT ONCE SET!
             provider: google
-            client_id: # SysBio OAuth2 Client ID
-            client_secret: # SysBio OAuth2 Client secret
+            client_id: "placeholder-client-id" # SysBio OAuth2 Client ID - REPLACE WITH REAL CREDENTIALS
+            client_secret: "placeholder-client-secret" # SysBio OAuth2 Client secret - REPLACE WITH REAL CREDENTIALS
             mapper_url: "base64://bG9jYWwgY2xhaW1zID0gewogIGVtYWlsX3ZlcmlmaWVkOiBmYWxzZSwKfSArIHN0ZC5leHRWYXIoJ2NsYWltcycpOwoKewogIGlkZW50aXR5OiB7CiAgICB0cmFpdHM6IHsKICAgICAgW2lmICdlbWFpbCcgaW4gY2xhaW1zICYmIGNsYWltcy5lbWFpbF92ZXJpZmllZCB0aGVuICdlbWFpbCcgZWxzZSBudWxsXTogY2xhaW1zLmVtYWlsLAogICAgICBuYW1lOiB7CiAgICAgICAgZmlyc3Q6IGNsYWltcy5naXZlbl9uYW1lLAogICAgICAgIGxhc3Q6IGNsYWltcy5mYW1pbHlfbmFtZQogICAgICB9LAogICAgICBbaWYgJ2hkJyBpbiBjbGFpbXMgdGhlbiAnaGQnIGVsc2UgbnVsbF06IGNsYWltcy5oZCwKICAgIH0sCiAgfSwKfQ=="
             issuer_url: https://accounts.google.com
             auth_url: https://accounts.google.com/o/oauth2/v2/auth
@@ -75,11 +75,11 @@ selfservice:
       ui_url: https://fairplex-login.io:4455/login
       lifespan: 10m
       # after:
-        # oidc:
-          # redirect after successful login or registration with `OIDC` method
-          # default_browser_return_url: http://127.0.0.1:5555/
-          # hooks:
-          #   - hook: revoke_active_sessions
+      # oidc:
+      # redirect after successful login or registration with `OIDC` method
+      # default_browser_return_url: http://127.0.0.1:5555/
+      # hooks:
+      #   - hook: revoke_active_sessions
 
     registration:
       lifespan: 10m
@@ -87,10 +87,8 @@ selfservice:
       after:
         password:
           hooks:
-            -
-              hook: session
-            -
-              hook: web_hook
+            - hook: session
+            - hook: web_hook
               config:
                 # url: http://127.0.0.1:4501/admin/ga4gh/passport/v1/users
                 url: http://passport-broker.ga4gh.org:4501/admin/ga4gh/passport/v1/users
@@ -99,10 +97,8 @@ selfservice:
         oidc:
           default_browser_return_url: https://fairplex.io
           hooks:
-            -
-              hook: session
-            -
-              hook: web_hook
+            - hook: session
+            - hook: web_hook
               config:
                 # url: http://127.0.0.1:4501/admin/ga4gh/passport/v1/users
                 url: http://passport-broker.ga4gh.org:4501/admin/ga4gh/passport/v1/users

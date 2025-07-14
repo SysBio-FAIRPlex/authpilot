@@ -8,27 +8,27 @@ import {
   redirectOnSoftError,
   RouteCreator,
   RouteRegistrator,
-} from "../pkg"
-import { LoginFlow } from "@ory/client"
-import { UserAuthCard } from "@ory/elements-markup"
-import path from "path"
-import { URLSearchParams } from "url"
+} from "../pkg";
+import { LoginFlow } from "@ory/client";
+import { UserAuthCard } from "@ory/elements-markup";
+import path from "path";
+import { URLSearchParams } from "url";
 
 export const createLoginRoute: RouteCreator =
   (createHelpers) => async (req, res, next) => {
-    res.locals.projectName = "Sign in"
+    res.locals.projectName = "Sign in";
 
     const {
       flow,
       aal = "",
       refresh = "",
-      return_to = process.env.HYDRA_URL!,
+      return_to = process.env.HYDRA_PUBLIC_URL || process.env.HYDRA_URL!,
       organization = "",
       via = "",
       login_challenge,
-    } = req.query
+    } = req.query;
     const { frontend, kratosBrowserUrl, logoUrl, extraPartials } =
-      createHelpers(req, res)
+      createHelpers(req, res);
 
     const initFlowQuery = new URLSearchParams({
       aal: aal.toString(),
@@ -36,31 +36,35 @@ export const createLoginRoute: RouteCreator =
       return_to: return_to.toString(),
       organization: organization.toString(),
       via: via.toString(),
-    })
+    });
 
     if (isQuerySet(login_challenge)) {
-      logger.debug("login_challenge found in URL query: ", { query: req.query })
-      initFlowQuery.append("login_challenge", login_challenge)
+      logger.debug("login_challenge found in URL query: ", {
+        query: req.query,
+      });
+      initFlowQuery.append("login_challenge", login_challenge);
     }
 
-    const initFlowUrl = getUrlForFlow(kratosBrowserUrl, "login", initFlowQuery)
+    const initFlowUrl = getUrlForFlow(kratosBrowserUrl, "login", initFlowQuery);
 
     // The flow is used to identify the settings and registration flow and
     // return data like the csrf_token and so on.
     if (!isQuerySet(flow)) {
       logger.debug("No flow ID found in URL query initializing login flow", {
         query: req.query,
-      })
-      console.log(`fairplex-client/login no flow ID found, redirecting to ${initFlowUrl}`)
-      res.redirect(303, initFlowUrl)
-      return
+      });
+      console.log(
+        `fairplex-client/login no flow ID found, redirecting to ${initFlowUrl}`
+      );
+      res.redirect(303, initFlowUrl);
+      return;
     }
 
     // It is probably a bit strange to have a logout URL here, however this screen
     // is also used for 2FA flows. If something goes wrong there, we probably want
     // to give the user the option to sign out!
     const getLogoutUrl = async (loginFlow: LoginFlow) => {
-      let logoutUrl = ""
+      let logoutUrl = "";
       try {
         logoutUrl = await frontend
           .createBrowserLogoutFlow({
@@ -68,12 +72,12 @@ export const createLoginRoute: RouteCreator =
             returnTo:
               (return_to && return_to.toString()) || loginFlow.return_to || "",
           })
-          .then(({ data }) => data.logout_url)
-        return logoutUrl
+          .then(({ data }) => data.logout_url);
+        return logoutUrl;
       } catch (err) {
-        logger.error("Unable to create logout URL", { error: err })
+        logger.error("Unable to create logout URL", { error: err });
       }
-    }
+    };
 
     const redirectToVerificationFlow = (loginFlow: LoginFlow) => {
       // we will create a new verification flow and redirect the user to the verification page
@@ -85,17 +89,17 @@ export const createLoginRoute: RouteCreator =
         .then(({ headers, data: verificationFlow }) => {
           // we need the csrf cookie from the verification flow
           if (headers["set-cookie"]) {
-            res.setHeader("set-cookie", headers["set-cookie"])
+            res.setHeader("set-cookie", headers["set-cookie"]);
           }
           // encode the verification flow id in the query parameters
           const verificationParameters = new URLSearchParams({
             flow: verificationFlow.id,
             message: JSON.stringify(loginFlow.ui.messages),
-          })
+          });
 
-          const baseUrl = req.path.split("/")
+          const baseUrl = req.path.split("/");
           // get rid of the last part of the path (e.g. "login")
-          baseUrl.pop()
+          baseUrl.pop();
 
           // redirect to the verification page with the custom message
           res.redirect(
@@ -103,9 +107,9 @@ export const createLoginRoute: RouteCreator =
             // join the base url with the verification path
             path.join(
               req.baseUrl,
-              "verification?" + verificationParameters.toString(),
-            ),
-          )
+              "verification?" + verificationParameters.toString()
+            )
+          );
         })
         .catch(
           redirectOnSoftError(
@@ -119,11 +123,11 @@ export const createLoginRoute: RouteCreator =
                   (return_to && return_to.toString()) ||
                   loginFlow.return_to ||
                   "",
-              }),
-            ),
-          ),
-        )
-    }
+              })
+            )
+          )
+        );
+    };
 
     return frontend
       .getLoginFlow({ id: flow, cookie: req.header("cookie") })
@@ -132,7 +136,7 @@ export const createLoginRoute: RouteCreator =
           // the login requires that the user verifies their email address before logging in
           if (flow.ui.messages.some(({ id }) => id === 4000010)) {
             // we will create a new verification flow and redirect the user to the verification page
-            return redirectToVerificationFlow(flow)
+            return redirectToVerificationFlow(flow);
           }
         }
 
@@ -140,20 +144,20 @@ export const createLoginRoute: RouteCreator =
         const initRegistrationQuery = new URLSearchParams({
           return_to:
             (return_to && return_to.toString()) || flow.return_to || "",
-        })
+        });
         if (flow.oauth2_login_request?.challenge) {
           initRegistrationQuery.set(
             "login_challenge",
-            flow.oauth2_login_request.challenge,
-          )
+            flow.oauth2_login_request.challenge
+          );
         }
 
-        let initRecoveryUrl = ""
+        let initRecoveryUrl = "";
         const initRegistrationUrl = getUrlForFlow(
           kratosBrowserUrl,
           "registration",
-          initRegistrationQuery,
-        )
+          initRegistrationQuery
+        );
         if (!flow.refresh) {
           initRecoveryUrl = getUrlForFlow(
             kratosBrowserUrl,
@@ -161,13 +165,13 @@ export const createLoginRoute: RouteCreator =
             new URLSearchParams({
               return_to:
                 (return_to && return_to.toString()) || flow.return_to || "",
-            }),
-          )
+            })
+          );
         }
 
-        let logoutUrl: string | undefined = ""
+        let logoutUrl: string | undefined = "";
         if (flow.requested_aal === "aal2" || flow.refresh) {
-          logoutUrl = await getLogoutUrl(flow)
+          logoutUrl = await getLogoutUrl(flow);
         }
         res.render("login", {
           nodes: flow.ui.nodes,
@@ -183,18 +187,18 @@ export const createLoginRoute: RouteCreator =
                 loginURL: initFlowUrl,
               },
             },
-            { locale: res.locals.lang },
+            { locale: res.locals.lang }
           ),
           extraPartial: extraPartials?.login,
           extraContext: res.locals.extraContext,
-        })
+        });
       })
-      .catch(redirectOnSoftError(res, next, initFlowUrl))
-  }
+      .catch(redirectOnSoftError(res, next, initFlowUrl));
+  };
 
 export const registerLoginRoute: RouteRegistrator = (
   app,
-  createHelpers = defaultConfig,
+  createHelpers = defaultConfig
 ) => {
-  app.get("/login", createLoginRoute(createHelpers))
-}
+  app.get("/login", createLoginRoute(createHelpers));
+};

@@ -4,6 +4,8 @@ This is a **GA4GH Authentication and Authorization Infrastructure (AAI) proof of
 
 ## Quick Start
 
+For detailed local development setup, see **[LOCAL_SETUP.md](LOCAL_SETUP.md)**.
+
 ```bash
 docker-compose -f auth-pilot-compose.yml up --force-recreate -d
 ```
@@ -15,6 +17,7 @@ The system consists of 5 main microservices that work together to provide secure
 ### Core Components
 
 #### 1. **fairplex-client** (TypeScript/Node.js)
+
 - **Purpose**: Frontend client application that orchestrates the authentication flow
 - **Key Features**:
   - Handles OpenID Connect authentication with Hydra
@@ -23,6 +26,7 @@ The system consists of 5 main microservices that work together to provide secure
   - Exchanges tokens for GA4GH Passports
 
 #### 2. **auth-pilot-amp-pd-visa-issuer** (Python/FastAPI)
+
 - **Purpose**: Issues GA4GH Visas for AMP-PD dataset access authorization
 - **Key Features**:
   - Generates RSA key pairs for signing Visas
@@ -31,6 +35,7 @@ The system consists of 5 main microservices that work together to provide secure
   - Provides mock DRS (Data Repository Service) endpoints
 
 #### 3. **auth-pilot-data-transfer** (Python/FastAPI)
+
 - **Purpose**: Handles secure data transfers between cloud storage systems
 - **Key Features**:
   - Downloads files from signed URLs
@@ -38,12 +43,14 @@ The system consists of 5 main microservices that work together to provide secure
   - Manages temporary file handling during transfers
 
 #### 4. **auth-pilot-terra-api** (Python/FastAPI)
+
 - **Purpose**: Interfaces with Terra/Firecloud APIs for group membership validation
 - **Key Features**:
   - Authenticates using Google service accounts
   - Fetches user group membership data for authorization decisions
 
 #### 5. **fairplex-token-exchange** (Python/FastAPI)
+
 - **Purpose**: Implements OAuth2 token exchange for GA4GH Passports
 - **Key Features**:
   - Exchanges OAuth2 access tokens for GA4GH Passport tokens
@@ -54,16 +61,19 @@ The system consists of 5 main microservices that work together to provide secure
 This POC implements the GA4GH Authentication and Authorization Infrastructure standard:
 
 ### **Visas**
+
 - Cryptographically signed assertions about a researcher's attributes or access rights
 - Contain claims like dataset access permissions and user group memberships
 - Signed by trusted Visa Issuers using RSA keys
 
 ### **Passports**
+
 - Collections of Visas bundled together in a single token
 - Presented to data repositories for access decisions
 - Enable federated authorization across multiple institutions
 
 ### **Data Flow**
+
 1. **User Authentication**: User logs in via Google OAuth through Kratos/Hydra
 2. **Token Exchange**: Access token exchanged for GA4GH Passport containing Visas
 3. **Authorization**: Passport validates user's access to AMP-PD datasets
@@ -81,26 +91,33 @@ This POC implements the GA4GH Authentication and Authorization Infrastructure st
 
 1. You must put in the fairplex client id/secret in config/kratos-fairplex.yml
 2. You must authenticate with the Auth-Spike project in Google Cloud cli:
+
 ```bash
 gcloud config set account your-email@sysbio-fairplex.org
 gcloud config set project auth-spike-445014
 gcloud auth application-default login
 ```
+
 3. You will need the service key file for the amp-pd-visa-issuer service to create a signed url. It is currently providing the DRS service.
 
 ## Deployment
 
 ### Local Development
+
 Uses Docker Compose with all services running locally:
+
 - Includes Ory Hydra and Kratos for identity management
 - All microservices communicate via Docker network
 - Suitable for development and testing
 
 ### Production (Google Cloud Run)
+
 Each service deployed as a separate Cloud Run service:
+
 - Auto-scaling based on demand
 - Configuration managed via Google Secret Manager
 - See `cloudrundeploy/README.md` for deployment instructions
 
 ## Todos
+
 1. Make a separate DRS service

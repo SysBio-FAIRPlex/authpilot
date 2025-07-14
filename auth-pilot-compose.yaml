@@ -1,21 +1,20 @@
 # docker-compose -f auth-pilot-compose.yml up --force-recreate -d
 
 services:
-
   nginx:
     image: nginx:latest
     ## Either use host network mode or uncomment the following line
     ports:
-     - "80:80"
-     - "443:443"
-     - "4444:4444"
-     - "4445:4445"
-     - "3000:3000"
-     - "4455:4455"
-     - "4433:4433"
-     - "4434:4434"
+      - "80:80"
+      - "443:443"
+      - "4444:4444"
+      - "4445:4445"
+      - "3000:3000"
+      - "4455:4455"
+      - "4433:4433"
+      - "4434:4434"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx-minimal.conf:/etc/nginx/nginx.conf
       - ./certs:/etc/nginx/certs
       # Uncomment the following line if you want to use password protection
       # - ./auth:/etc/nginx/auth
@@ -26,16 +25,28 @@ services:
   fairplex-client-app:
     image: fairplex-client:0.1
     environment:
-      - HYDRA_URL=http://hydra:4444
+      - MY_PORT=8884
+      # Hydra URLs - Private for internal service communication, Public for user-facing redirects
+      - HYDRA_PRIVATE_URL=http://hydra:4444
+      - HYDRA_PUBLIC_URL=http://localhost:4444
+      - HYDRA_URL=http://hydra:4444 # Fallback for backward compatibility
       - HYDRA_CLIENT_ID=FAIRplex
       - HYDRA_CLIENT_SECRET=secret
-      - OAUTH_CALLBACK=http://fairplex.io/callback
+      # OAuth callback URL - should be public URL where users are redirected
+      - OAUTH_CALLBACK=http://localhost:8884/callback
+      # Internal service URLs - use private/internal addresses
+      - AUTH_PILOT_TOKEN_EXCHANGE_PRIVATE_URL=http://fairplex-token-exchange:8000
       - AUTH_PILOT_TOKEN_EXCHANGE_URL=http://fairplex-token-exchange:8000/token-exchange
+      - AMP_PD_DRS_PRIVATE_URI=http://auth-pilot-amp-pd-visa-issuer:7000
       - AMP_PD_DRS_URI=http://auth-pilot-amp-pd-visa-issuer:7000/drs/v1/objects/auth-pilot-test-data/test-data.txt
+      - AUTH_PILOT_DATA_TRANSFER_PRIVATE_URL=http://auth-pilot-data-transfer:7100
       - AUTH_PILOT_DATA_TRANSFER_URL=http://auth-pilot-data-transfer:7100/transfer
+      # External/Public URLs for user-facing features
       - AMP_PD_DESTINATION_URI=gs://auth-pilot-test-data/download
-    expose:
-      - "5554:5554"
+      # Host configuration
+      - MY_HOST=http://localhost:8884
+    ports:
+      - "8884:8884"
     restart: unless-stopped
     depends_on:
       hydra:
@@ -44,9 +55,8 @@ services:
     networks:
       - intranet
 
-
   # Hydra ##
-      # --skip-consent
+  # --skip-consent
   fairplex-oidc-client:
     image: oryd/hydra:latest
     command: >
@@ -58,7 +68,7 @@ services:
       --format json
       --scope openid,profile,email,ga4gh_passport_v1
       --token-endpoint-auth-method client_secret_post
-      --redirect-uri http://fairplex.io/callback
+      --redirect-uri http://localhost:8884/callback
     depends_on:
       hydra:
         condition: service_healthy
@@ -69,9 +79,9 @@ services:
   hydra:
     image: oryd/hydra:latest
     expose:
-      - "80:4444" # Public port
-      - "4445:4445" # Admin port
-      - "5555:5555" # Port for hydra token user
+      - "4444" # Public port
+      - "4445" # Admin port
+      - "5555" # Port for hydra token user
     command: serve -c /etc/config/hydra/hydra-fairplex.yml all --dev
     volumes:
       - type: volume
@@ -83,6 +93,7 @@ services:
         target: /etc/config/hydra
     environment:
       - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
+      - URLS_SELF_ISSUER=http://localhost:4444
     restart: unless-stopped
     healthcheck:
       test: "wget -qO- http://hydra:4444/health/ready || exit 1"
@@ -124,7 +135,7 @@ services:
       - POSTGRES_DB=hydra
     networks:
       - intranet
-  
+
   ## Kratos ##
 
   kratos-migrate:
@@ -149,8 +160,8 @@ services:
       - kratos-migrate
     image: oryd/kratos:latest
     expose:
-      - '4433:4433' # public
-      - '4434:4434' # admin
+      - "4433:4433" # public
+      - "4434:4434" # admin
     restart: unless-stopped
     environment:
       - DSN=sqlite:///var/lib/sqlite/db.sqlite?_fk=true
@@ -167,40 +178,40 @@ services:
     networks:
       - intranet
     container_name: kratos
-  
-  kratos-selfservice-ui-node:
-    image: oryd/kratos-selfservice-ui-node:local
-    expose:
-      - "3000:3000"
-    environment:
-      - PORT=3000
-      - HYDRA_ADMIN_URL=http://hydra:4445
-      - KRATOS_PUBLIC_URL=http://kratos:4433
-      - KRATOS_ADMIN_URL=http://kratos:4434
-      - KRATOS_BROWSER_URL=https://fairplex-login.io:4433
-      - COOKIE_SECRET=changeme
-      - CSRF_COOKIE_NAME=cookie_name
-      - CSRF_COOKIE_SECRET=changeme
-      - DANGEROUSLY_DISABLE_SECURE_CSRF_COOKIES=false
-    networks:
-      - intranet
 
-  passport-ui-node:
-    image: ga4gh/ga4gh-starter-kit-passport-ui-node:local #0.0.1
-    environment:
-      - KRATOS_PUBLIC_URL=http://kratos:4433/
-      - KRATOS_ADMIN_URL=http://kratos:4434/
-      - PORT=4455
-      - SECURITY_MODE=
-      - KRATOS_BROWSER_URL=https://fairplex-login.io:4433
-      - PASSPORT_BROKER_PUBLIC_URL=http://passport-broker.ga4gh.org:4500/ga4gh/passport/v1/ 
-      - PASSPORT_BROKER_ADMIN_URL=http://passport-broker.ga4gh.org:4501/admin/ga4gh/passport/v1/ 
-    expose:
-      - "4455:4455"
-    restart: unless-stopped
-    networks:
-      - intranet
-    container_name: passport-ui-node
+  # kratos-selfservice-ui-node:
+  #   image: oryd/kratos-selfservice-ui-node:local
+  #   expose:
+  #     - "3000:3000"
+  #   environment:
+  #     - PORT=3000
+  #     - HYDRA_ADMIN_URL=http://hydra:4445
+  #     - KRATOS_PUBLIC_URL=http://kratos:4433
+  #     - KRATOS_ADMIN_URL=http://kratos:4434
+  #     - KRATOS_BROWSER_URL=https://fairplex-login.io:4433
+  #     - COOKIE_SECRET=changeme
+  #     - CSRF_COOKIE_NAME=cookie_name
+  #     - CSRF_COOKIE_SECRET=changeme
+  #     - DANGEROUSLY_DISABLE_SECURE_CSRF_COOKIES=false
+  #   networks:
+  #     - intranet
+
+  # passport-ui-node:
+  #   image: ga4gh/ga4gh-starter-kit-passport-ui-node:local #0.0.1
+  #   environment:
+  #     - KRATOS_PUBLIC_URL=http://kratos:4433/
+  #     - KRATOS_ADMIN_URL=http://kratos:4434/
+  #     - PORT=4455
+  #     - SECURITY_MODE=
+  #     - KRATOS_BROWSER_URL=https://fairplex-login.io:4433
+  #     - PASSPORT_BROKER_PUBLIC_URL=http://passport-broker.ga4gh.org:4500/ga4gh/passport/v1/
+  #     - PASSPORT_BROKER_ADMIN_URL=http://passport-broker.ga4gh.org:4501/admin/ga4gh/passport/v1/
+  #   expose:
+  #     - "4455:4455"
+  #   restart: unless-stopped
+  #   networks:
+  #     - intranet
+  #   container_name: passport-ui-node
 
   fairplex-token-exchange:
     image: fairplex-token-exchange:0.1
@@ -218,13 +229,13 @@ services:
     networks:
       - intranet
     container_name: fairplex-token-exchange
-  
+
   auth-pilot-amp-pd-visa-issuer:
     image: auth-pilot-amp-pd-visa-issuer:0.1
-    volumes:
-      - /Users/haduong/Downloads/auth-spike-445014-d6cebb32a765.json:/app/service-account-key.json
-    environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account-key.json
+    # volumes:
+    #   - /path/to/your/service-account-key.json:/app/service-account-key.json
+    # environment:
+    #   - GOOGLE_APPLICATION_CREDENTIALS=/app/service-account-key.json
     expose:
       - "7000:7000"
     restart: unless-stopped
@@ -235,12 +246,12 @@ services:
 
   auth-pilot-data-transfer:
     image: auth-pilot-data-transfer:0.1
-    expose:
+    ports:
       - "7100:7100"
-    volumes:
-      - ~/.config/gcloud:/root/.config/gcloud:ro
+    # volumes:
+    #   - ~/.config/gcloud:/root/.config/gcloud:ro
     environment:
-      - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
+      # - GOOGLE_APPLICATION_CREDENTIALS=/root/.config/gcloud/application_default_credentials.json
       - GOOGLE_CLOUD_PROJECT=auth-spike
     command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7100"]
     restart: unless-stopped
