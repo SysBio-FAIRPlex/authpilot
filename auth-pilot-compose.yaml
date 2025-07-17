@@ -23,12 +23,13 @@ services:
       - intranet
 
   fairplex-client-app:
+    build: ./fairplex-client
     image: fairplex-client:0.1
     environment:
       - MY_PORT=8884
       # Hydra URLs - Private for internal service communication, Public for user-facing redirects
       - HYDRA_PRIVATE_URL=http://hydra:4444
-      - HYDRA_PUBLIC_URL=http://localhost:4444
+      - HYDRA_PUBLIC_URL=http://fairplex-login.io:4444
       - HYDRA_URL=http://hydra:4444 # Fallback for backward compatibility
       - HYDRA_ADMIN_URL=http://hydra:4445
       - HYDRA_CLIENT_ID=FAIRplex
@@ -36,9 +37,9 @@ services:
       # Kratos URLs - Required for Ory SDK integration
       - KRATOS_PUBLIC_URL=http://kratos:4433
       - KRATOS_ADMIN_URL=http://kratos:4434
-      - KRATOS_BROWSER_URL=http://localhost:4433
+      - KRATOS_BROWSER_URL=http://fairplex-login.io:4433
       # OAuth callback URL - should be public URL where users are redirected
-      - OAUTH_CALLBACK=http://localhost:8884/callback
+      - OAUTH_CALLBACK=http://fairplex.io:8884/callback
       # CSRF protection for consent route
       - CSRF_COOKIE_NAME=fairplex_csrf
       - CSRF_COOKIE_SECRET=changeme-this-should-be-random-in-production
@@ -54,7 +55,7 @@ services:
       # External/Public URLs for user-facing features
       - AMP_PD_DESTINATION_URI=gs://auth-pilot-test-data/download
       # Host configuration
-      - MY_HOST=http://localhost:8884
+      - MY_HOST=http://fairplex.io:8884
     ports:
       - "8884:8884"
     restart: unless-stopped
@@ -78,7 +79,7 @@ services:
       --format json
       --scope openid,profile,email,ga4gh_passport_v1
       --token-endpoint-auth-method client_secret_post
-      --redirect-uri http://localhost:8884/callback
+      --redirect-uri http://fairplex.io:8884/callback
     depends_on:
       hydra:
         condition: service_healthy
@@ -103,7 +104,7 @@ services:
         target: /etc/config/hydra
     environment:
       - DSN=postgres://hydra:secret@postgresd:5432/hydra?sslmode=disable&max_conns=20&max_idle_conns=4
-      - URLS_SELF_ISSUER=http://localhost:4444
+      - URLS_SELF_ISSUER=http://fairplex-login.io:4444
     restart: unless-stopped
     healthcheck:
       test: "wget -qO- http://hydra:4444/health/ready || exit 1"
