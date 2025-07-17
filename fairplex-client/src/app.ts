@@ -11,6 +11,7 @@ import { handlebarsHelpers } from "./pkg";
 import { logger, middleware as middlewareLogger } from "./pkg/logger";
 import {
   registerConsentRoute,
+  registerErrorRoute,
   registerLoginRoute,
   registerStaticRoutes,
 } from "./routes";
@@ -105,6 +106,7 @@ app.engine(
 const customSession = new Map<string, CustomSessionData>();
 
 registerLoginRoute(router);
+registerErrorRoute(router);
 // all routes registered under the /consent path are protected by CSRF
 router.use("/consent", doubleCsrfProtection);
 router.use("/consent", csrfErrorHandler(invalidCsrfTokenError));

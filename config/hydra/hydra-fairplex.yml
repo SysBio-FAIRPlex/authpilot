@@ -4,11 +4,11 @@ serve:
 
 urls:
   self:
-    issuer: http://localhost:4444
-    # issuer: http://hydra:4444
-  consent: https://fairplex-login.io:3000/consent
-  login: https://fairplex-login.io:3000/login
-  logout: https://fairplex-login.io:3000/logout
+    issuer: http://hydra:4444
+    # issuer: http://localhost:4444
+  consent: http://localhost:8884/consent
+  login: http://localhost:8884/login
+  logout: http://localhost:8884/logout
 
 secrets:
   system:

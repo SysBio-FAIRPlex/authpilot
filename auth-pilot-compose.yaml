@@ -30,10 +30,20 @@ services:
       - HYDRA_PRIVATE_URL=http://hydra:4444
       - HYDRA_PUBLIC_URL=http://localhost:4444
       - HYDRA_URL=http://hydra:4444 # Fallback for backward compatibility
+      - HYDRA_ADMIN_URL=http://hydra:4445
       - HYDRA_CLIENT_ID=FAIRplex
       - HYDRA_CLIENT_SECRET=secret
+      # Kratos URLs - Required for Ory SDK integration
+      - KRATOS_PUBLIC_URL=http://kratos:4433
+      - KRATOS_ADMIN_URL=http://kratos:4434
+      - KRATOS_BROWSER_URL=http://localhost:4433
       # OAuth callback URL - should be public URL where users are redirected
       - OAUTH_CALLBACK=http://localhost:8884/callback
+      # CSRF protection for consent route
+      - CSRF_COOKIE_NAME=fairplex_csrf
+      - CSRF_COOKIE_SECRET=changeme-this-should-be-random-in-production
+      # Cookie parser secret for signed cookies
+      - COOKIE_SECRET=changeme-this-should-be-random-in-production
       # Internal service URLs - use private/internal addresses
       - AUTH_PILOT_TOKEN_EXCHANGE_PRIVATE_URL=http://fairplex-token-exchange:8000
       - AUTH_PILOT_TOKEN_EXCHANGE_URL=http://fairplex-token-exchange:8000/token-exchange
@@ -163,9 +173,14 @@ services:
       - "4433:4433" # public
       - "4434:4434" # admin
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       - DSN=sqlite:///var/lib/sqlite/db.sqlite?_fk=true
       - LOG_LEVEL=trace
+      # Google OAuth credentials - using Kratos environment variable format
+      - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_ID=${GOOGLE_OAUTH_CLIENT_ID}
+      - SELFSERVICE_METHODS_OIDC_CONFIG_PROVIDERS_0_CLIENT_SECRET=${GOOGLE_OAUTH_CLIENT_SECRET}
     command: serve -c /etc/config/kratos/kratos-fairplex.yml --dev --watch-courier
     volumes:
       - type: volume

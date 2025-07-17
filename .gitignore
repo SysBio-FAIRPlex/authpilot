@@ -5,3 +5,9 @@ kubernetes/controllers/kubectl
 **/node_modules
 **/dist
 **/.venv
+
+# Environment files containing secrets
+.env
+.env.local
+.env.production
+.env.*.local
