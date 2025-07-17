@@ -15,12 +15,20 @@ class DownloadRequest(BaseModel):
     destination_path: str
 
 
-# Initialize Google Cloud Storage client
-storage_client = storage.Client()
+# Initialize Google Cloud Storage client (optional for local development)
+try:
+    storage_client = storage.Client()
+    print("Google Cloud Storage client initialized successfully")
+except Exception as e:
+    print(f"Warning: Could not initialize Google Cloud Storage client: {e}")
+    storage_client = None
 
 @app.post("/transfer")
 async def download_and_upload(request: DownloadRequest):
     try:
+        if storage_client is None:
+            raise HTTPException(status_code=503, detail="Google Cloud Storage not available in local development mode")
+        
         # Get the bucket
         bucket = storage_client.bucket(request.destination_bucket)
         

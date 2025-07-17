@@ -4,7 +4,7 @@ dsn: memory
 
 serve:
   public:
-    base_url: https://fairplex-login.io:4433/
+    base_url: http://localhost:4433/
     cors:
       enabled: true
   admin:
@@ -16,6 +16,7 @@ selfservice:
     - http://passport-ui-node:4455
     - https://fairplex.io
     - http://hydra:4444
+    - http://localhost:4444
   methods:
     password:
       enabled: false #true
@@ -24,8 +25,8 @@ selfservice:
         providers:
           - id: google # this is `<provider-id>` in the Authorization callback URL. DO NOT CHANGE IT ONCE SET!
             provider: google
-            client_id: # SysBio OAuth2 Client ID
-            client_secret: # SysBio OAuth2 Client secret
+            client_id: placeholder # Will be overridden by environment variable
+            client_secret: placeholder # Will be overridden by environment variable
             mapper_url: "base64://bG9jYWwgY2xhaW1zID0gewogIGVtYWlsX3ZlcmlmaWVkOiBmYWxzZSwKfSArIHN0ZC5leHRWYXIoJ2NsYWltcycpOwoKewogIGlkZW50aXR5OiB7CiAgICB0cmFpdHM6IHsKICAgICAgW2lmICdlbWFpbCcgaW4gY2xhaW1zICYmIGNsYWltcy5lbWFpbF92ZXJpZmllZCB0aGVuICdlbWFpbCcgZWxzZSBudWxsXTogY2xhaW1zLmVtYWlsLAogICAgICBuYW1lOiB7CiAgICAgICAgZmlyc3Q6IGNsYWltcy5naXZlbl9uYW1lLAogICAgICAgIGxhc3Q6IGNsYWltcy5mYW1pbHlfbmFtZQogICAgICB9LAogICAgICBbaWYgJ2hkJyBpbiBjbGFpbXMgdGhlbiAnaGQnIGVsc2UgbnVsbF06IGNsYWltcy5oZCwKICAgIH0sCiAgfSwKfQ=="
             issuer_url: https://accounts.google.com
             auth_url: https://accounts.google.com/o/oauth2/v2/auth
@@ -51,63 +52,61 @@ selfservice:
 
   flows:
     error:
-      ui_url: http://127.0.0.1:4455/error
+      ui_url: http://localhost:8884/error
 
     settings:
-      ui_url: http://127.0.0.1:4455/settings
+      ui_url: http://localhost:8884/settings
       privileged_session_max_age: 15m
 
     recovery:
       enabled: true
-      ui_url: http://127.0.0.1:4455/recovery
+      ui_url: http://localhost:8884/recovery
 
     verification:
       enabled: true
-      ui_url: http://127.0.0.1:4455/verification
+      ui_url: http://localhost:8884/verification
       after:
-        default_browser_return_url: http://127.0.0.1:4455/
+        default_browser_return_url: http://localhost:8884/
 
     logout:
       after:
-        default_browser_return_url: http://127.0.0.1:4455/login
+        default_browser_return_url: http://localhost:8884/login
 
     login:
-      ui_url: https://fairplex-login.io:4455/login
+      ui_url: http://localhost:8884/login
       lifespan: 10m
       # after:
-        # oidc:
-          # redirect after successful login or registration with `OIDC` method
-          # default_browser_return_url: http://127.0.0.1:5555/
-          # hooks:
-          #   - hook: revoke_active_sessions
+      # oidc:
+      # redirect after successful login or registration with `OIDC` method
+      # default_browser_return_url: http://127.0.0.1:5555/
+      # hooks:
+      #   - hook: revoke_active_sessions
 
     registration:
       lifespan: 10m
-      ui_url: https://fairplex-login.io:4455/registration
+      ui_url: http://localhost:8884/registration
       after:
         password:
           hooks:
-            -
-              hook: session
-            -
-              hook: web_hook
-              config:
-                # url: http://127.0.0.1:4501/admin/ga4gh/passport/v1/users
-                url: http://passport-broker.ga4gh.org:4501/admin/ga4gh/passport/v1/users
-                method: POST
-                body: file:///etc/config/kratos/register.jsonnet
+            - hook: session
+            # Disabled GA4GH passport webhook for now - missing register.jsonnet file
+            # - hook: web_hook
+            #   config:
+            #     # url: http://127.0.0.1:4501/admin/ga4gh/passport/v1/users
+            #     url: http://passport-broker.ga4gh.org:4501/admin/ga4gh/passport/v1/users
+            #     method: POST
+            #     body: file:///etc/config/kratos/register.jsonnet
         oidc:
           default_browser_return_url: https://fairplex.io
           hooks:
-            -
-              hook: session
-            -
-              hook: web_hook
-              config:
-                # url: http://127.0.0.1:4501/admin/ga4gh/passport/v1/users
-                url: http://passport-broker.ga4gh.org:4501/admin/ga4gh/passport/v1/users
-                method: POST
-                body: file:///etc/config/kratos/register.jsonnet
+            - hook: session
+            # Disabled GA4GH passport webhook for now - missing register.jsonnet file
+            # - hook: web_hook
+            #   config:
+            #     # url: http://127.0.0.1:4501/admin/ga4gh/passport/v1/users
+            #     url: http://passport-broker.ga4gh.org:4501/admin/ga4gh/passport/v1/users
+            #     method: POST
+            #     body: file:///etc/config/kratos/register.jsonnet
 
 log:
   level: debug

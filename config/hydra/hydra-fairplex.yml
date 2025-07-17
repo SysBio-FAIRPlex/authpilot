@@ -4,12 +4,11 @@ serve:
 
 urls:
   self:
-    issuer: http://hydra:4444
-    # issuer: http://127.0.0.1:4444
-  consent: https://fairplex-login.io:3000/consent
-  login: https://fairplex-login.io:3000/login
-  logout: https://fairplex-login.io:3000/logout
-
+    issuer: http://fairplex-login.io:4444
+    # issuer: http://localhost:4444
+  consent: http://fairplex.io:8884/consent
+  login: http://fairplex.io:8884/login
+  logout: http://fairplex.io:8884/logout
 
 secrets:
   system:
@@ -28,6 +27,5 @@ strategies:
   access_token: jwt #opaque # Use jwt for access tokens
   jwt:
     scope_claim: string
-
 # oauth2:
 #   token_hook: http://hydra-token-hook:3700/token-hook

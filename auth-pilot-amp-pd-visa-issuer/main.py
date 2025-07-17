@@ -71,15 +71,17 @@ def generate_visa_keys():
     )
 
 async def get_amp_pd_groups():
+    global AMP_PD_GROUPS
     auth_pilot_terra_groups_url = os.environ.get('AMP_PD_AUTH_URL')
     if not auth_pilot_terra_groups_url:
-        raise Exception("AMP_PD_AUTH_URL environment variable is not set")
+        print("Warning: AMP_PD_AUTH_URL environment variable is not set. Using mock data for local development.")
+        AMP_PD_GROUPS = {"groups": ["mock-group-1", "mock-group-2"]}  # Mock data for local development
+        return
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             headers = {'accept': 'application/json'}
             response = await client.get(auth_pilot_terra_groups_url, headers=headers)
             response.raise_for_status()  # Raise an error for bad responses
-            global AMP_PD_GROUPS
             AMP_PD_GROUPS = response.json()
             print(AMP_PD_GROUPS)
     except httpx.HTTPStatusError as e:
