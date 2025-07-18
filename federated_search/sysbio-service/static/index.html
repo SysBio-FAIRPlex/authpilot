@@ -75,13 +75,21 @@ SELECT * FROM person LIMIT 10;
       return s;
     })();
     async function updateLoginButton() {
+      const loginDiv = document.getElementById("login-status");
+      const userinfoDiv = document.getElementById("userinfo-output");
+      loginDiv.innerHTML = `
+        <div>
+          <span class="spinner"></span>
+          <span class="loading-text">Loading login status...</span>
+        </div>
+      `;
+      userinfoDiv.innerHTML = "";
+
       try {
         const res = await fetch(`${AUTH_BASE}/session?state=${state}`, {
           credentials: "include"
         });
         const json = await res.json();
-        const loginDiv = document.getElementById("login-status");
-        const userinfoDiv = document.getElementById("userinfo-output");
 
         if (json?.user && json?.access_token) {
           truncatedJson = truncateValues(json, 35);
