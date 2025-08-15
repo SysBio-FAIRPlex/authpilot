@@ -2,7 +2,7 @@
 
 Goal: Create a unified API that enables client tools (like FAIRkit) to query data across AMP programs with respect to federation and governance.
 
-[SysBio: GA4GH Auth, Search API, & File Discovery doc](https://docs.google.com/document/d/1Im4XDBghVmgdPPercQi4Vg1aODB6kbfam1h10zqTHIM/edit?tab=t.0#heading=h.d5wb9roh9o17)
+[SysBio: GA4GH Auth, Search API, & File Discovery doc](https://docs.google.com/document/d/1Im4XDBghVmgdPPercQi4Vg1aODB6kbfam1h10zqTHIM/edit?tab=t.g9ozssacnemv#heading=h.gwp92a45r22t)
 
 ## Setup
 1. Create a python virtual environment for dependencies.
@@ -42,6 +42,8 @@ Grant the Default Compute Service Account the following roles:
 
 ### Environment variables
 Set the following variables in .env files:
+  [doc](https://docs.google.com/document/d/1cDtGceL5tKNPMpzDRZDkJoZgYk7g-M4LbVD8vsuuISY/edit?tab=t.0)
+
 
 ### Deploy script
 Run the `deploy.sh` script to deploy to Google Cloud Run. The script takes parameters for which services to deploy.
@@ -49,4 +51,10 @@ For example, to deploy all services, run the command
 
 ```sh
 ./deploy.sh all
+```
+
+Or to deploy a single service, run the command
+
+```sh
+./deploy.sh auth
 ```
