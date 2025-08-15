@@ -34,6 +34,10 @@ SELECT * FROM person LIMIT 10;
     <div id="sources"></div>
 
     <h2>Combined Results</h2>
+    <div style="margin-top: 1em;">
+      <button onclick="copyTableToClipboard()">Copy to Clipboard</button>
+      <span id="copy-status" style="margin-left: 1em; color: green;"></span>
+    </div>
     <div id="table-container"></div>
 
     <h2>Raw JSON Response</h2>
@@ -232,6 +236,35 @@ SELECT * FROM person LIMIT 10;
         responsePre.textContent = 'Error: ' + err.message;
         sourcesDiv.innerHTML = '';
       }
+    }
+    function copyTableToClipboard() {
+      const table = document.querySelector('#table-container table');
+      const copyStatus = document.getElementById('copy-status');
+      if (!table) {
+        copyStatus.textContent = 'No table to copy.';
+        return;
+      }
+
+      let csv = [];
+      const rows = table.querySelectorAll('tr');
+      for (let row of rows) {
+        const cols = row.querySelectorAll('th, td');
+        let rowData = [];
+        for (let col of cols) {
+          let text = col.textContent.replace(/"/g, '""'); // Escape quotes
+          rowData.push(`"${text}"`);
+        }
+        csv.push(rowData.join(','));
+      }
+
+      const csvText = csv.join('\n');
+      navigator.clipboard.writeText(csvText).then(() => {
+        copyStatus.textContent = 'Copied!';
+        setTimeout(() => (copyStatus.textContent = ''), 2000);
+      }).catch(err => {
+        copyStatus.textContent = 'Copy failed.';
+        console.error('Failed to copy table:', err);
+      });
     }
   </script>
 </body>

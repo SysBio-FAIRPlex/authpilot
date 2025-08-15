@@ -1,5 +1,6 @@
 import re
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -147,3 +148,64 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
             "next_page_url": next_page_url
         }
     }
+
+@router.get(
+    "/ga4gh/drs/v1/objects/{object_id}",
+    response_model=dict,
+    responses={
+        200: {"description": "DRS object returned successfully"},
+        404: {"description": "Object not found"},
+    }
+)
+async def get_drs_object(
+    object_id: str = Path(..., description="Unique identifier for the DRS object"),
+    user=Depends(get_current_user)
+):
+    DRS_OBJECTS = {
+        "xyz001": "ad_sample1.bam",
+        "xyz002": "ad_sample2.bam",
+        "xyz003": "ad_sample3.bam",
+        "xyz004": "ad_sample4.bam",
+        "xyz005": "ad_sample5.bam",
+        "xyz006": "ad_sample6.bam",
+        "xyz007": "ad_sample7.bam",
+        "xyz008": "ad_sample8.bam",
+        "xyz009": "ad_sample9.bam",
+        "xyz010": "ad_sample10.bam",
+        "abc123": "sample1.bam",
+        "def456": "sample2.bam",
+        "ghi789": "sample3.bam",
+        "jkl012": "sample4.bam",
+        "mno345": "sample5.bam",
+        "pqr678": "sample6.bam",
+        "stu901": "sample7.bam",
+        "vwx234": "sample8.bam",
+        "yz5678": "sample9.bam",
+        "abc999": "sample10.bam",
+    }
+
+    drs_object = {
+        "id": object_id,
+        "self_uri": f"drs://fairkit.example.org/{object_id}",
+        "description": "Example DRS object",
+        "created_time": "2023-10-10T12:00:00Z",
+        "updated_time": "2023-10-11T12:00:00Z",
+        "version": "1",
+        "mime_type": "application/json",
+        "checksums": [
+            {"checksum": "1a79a4d60de6718e8e5b326e338ae533", "type": "md5"}
+        ],
+        "size": 1024,
+        "aliases": ["test-object"],
+        "access_methods": [
+            {
+                "type": "https",
+                "access_url": {
+                    "url": f"https://storage.googleapis.com/willyn-public/{DRS_OBJECTS[object_id]}"
+                },
+                "region": "us-central1"
+            }
+        ]
+    }
+
+    return JSONResponse(content=drs_object)

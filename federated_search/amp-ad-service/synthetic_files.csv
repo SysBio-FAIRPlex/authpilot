@@ -1,0 +1,17 @@
+drs_url,filename,filesize_bytes,description
+drs://fairplex.amp-ad-example.org/xyz001,ad_sample1.bam,94000,AD Patient A alignment file
+drs://fairplex.amp-ad-example.org/xyz002,ad_sample2.bam,97000,AD Patient B alignment file
+drs://fairplex.amp-ad-example.org/xyz003,ad_sample3.bam,99000,AD Patient C alignment file
+drs://fairplex.amp-ad-example.org/xyz004,ad_sample4.bam,102000,AD Patient D alignment file
+drs://fairplex.amp-ad-example.org/xyz005,ad_sample5.bam,96000,AD Patient E alignment file
+drs://fairplex.amp-ad-example.org/xyz006,ad_sample6.bam,98500,AD Patient F alignment file
+drs://fairplex.amp-ad-example.org/xyz007,ad_sample7.bam,100200,AD Patient G alignment file
+drs://fairplex.amp-ad-example.org/xyz008,ad_sample8.bam,105300,AD Patient H alignment file
+drs://fairplex.amp-ad-example.org/xyz009,ad_sample9.bam,93000,AD Patient I alignment file
+drs://fairplex.amp-ad-example.org/xyz010,ad_sample10.bam,97000,AD Patient J alignment file
+drs://fairplex.amp-ad-example.org/xyz011,ad_sample11.bam,98000,AD Patient K alignment file
+drs://fairplex.amp-ad-example.org/xyz012,ad_sample12.bam,103000,AD Patient L alignment file
+drs://fairplex.amp-ad-example.org/xyz013,ad_sample13.bam,99000,AD Patient M alignment file
+drs://fairplex.amp-ad-example.org/xyz014,ad_sample14.bam,95000,AD Patient N alignment file
+drs://fairplex.amp-ad-example.org/xyz015,ad_sample15.bam,101500,AD Patient O alignment file
+drs://fairplex.amp-ad-example.org/xyz016,ad_sample16.bam,99000,AD Patient P alignment file
