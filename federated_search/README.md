@@ -46,6 +46,10 @@ Set the following variables in .env files:
 
 
 ### Deploy script
+N.B.: Before deploying to Google Cloud Run, you must ensure that the SQLite database file has already been generated.
+It is packaged as part of the Docker image during the build step, but the deploy script itself does not actually initialize the database files.
+(SQLite is a short-term solution for this prototype; we will eventually switch to a database like Postgres.)
+
 Run the `deploy.sh` script to deploy to Google Cloud Run. The script takes parameters for which services to deploy.
 For example, to deploy all services, run the command
 
