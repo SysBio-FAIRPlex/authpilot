@@ -2,6 +2,7 @@ import csv
 from app.database import Base, engine, SessionLocal
 from app.models.person import Person
 from app.models.synthetic_dataset import SyntheticDataset
+from app.models.synthetic_files import SyntheticFiles
 from google.cloud import bigquery
 
 # I'm arbitrarily choosing people with ID <= 1500 to be in PD
@@ -18,6 +19,7 @@ def init_db():
 
     print("Loading Synthetic Dataset from CSV...")
     load_synthetic_data_to_sqlite()
+    load_synthetic_files_to_sqlite()
     print("Synthetic CSV data loaded into SQLite")
 
 def sync_bigquery_to_sqlite():
@@ -91,6 +93,20 @@ def load_synthetic_data_to_sqlite():
               repository_link=row["repository_link"]
           )
           session.add(dataset)
+      session.commit()
+
+def load_synthetic_files_to_sqlite():
+  session = SessionLocal()
+  with open("synthetic_files.csv", newline='', encoding='utf-8') as csvfile:
+      reader = csv.DictReader(csvfile)
+      for row in reader:
+          syn_file = SyntheticFiles(
+              drs_url=row["drs_url"],
+              filename=row["filename"],
+              filesize_bytes=row["filesize_bytes"],
+              description=row["description"],
+          )
+          session.add(syn_file)
       session.commit()
 
 if __name__ == "__main__":
