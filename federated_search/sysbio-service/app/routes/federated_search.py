@@ -9,19 +9,21 @@ from app.utils.error_utils import error_response
 from app.dependencies import get_db
 from app.schemas import SearchRequest
 from jose import jwt, JWTError
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import httpx
 import os
 
 router = APIRouter()
 JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY"))
 ALGORITHM = "HS256"
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 AMP_PD_URL = os.getenv("AMP_PD_URL")
 AMP_AD_URL = os.getenv("AMP_AD_URL")
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+def get_current_user(token: Optional[str] = Depends(oauth2_scheme)):
+    if token is None:
+        return None
     assert JWT_SECRET is not None
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
@@ -68,39 +70,50 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
     except Exception as e:
         return error_response(400, title="Invalid SQL", detail=f"Invalid SQL: {e}")
 
+    public_restricted = {}
+    if not user:
+        public_restricted = {
+            "year_of_birth": "Visible to logged-in users",
+            "race": "Visible to logged-in users"
+        }
+        for row in public_data:
+            for field in public_restricted:
+                row.pop(field, None)
+
     pd_data, ad_data = [], []
     pd_restricted = {}
     sources = {"public": len(public_data)}
 
-    async with httpx.AsyncClient() as client:
-        try:
-            pd_response = await client.post(f"{AMP_PD_URL}/search", json=request.model_dump())
-            if pd_response.status_code == 200:
-                pd_json = pd_response.json()
-                pd_data = pd_json.get("data", [])
-                pd_restricted = pd_json.get("restricted_fields", {})
+    if user:
+        async with httpx.AsyncClient() as client:
+            try:
+                pd_response = await client.post(f"{AMP_PD_URL}/search", json=request.model_dump())
+                if pd_response.status_code == 200:
+                    pd_json = pd_response.json()
+                    pd_data = pd_json.get("data", [])
+                    pd_restricted = pd_json.get("restricted_fields", {})
 
-                sources["pd"] = len(pd_data)
-            elif pd_response.status_code == 403:
-                sources["pd"] = 403
-            else:
-                pd_response.raise_for_status()
-        except Exception as e:
-            print(f"PD service error: {e}")
-            sources["pd"] = 0
+                    sources["pd"] = len(pd_data)
+                elif pd_response.status_code == 403:
+                    sources["pd"] = 403
+                else:
+                    pd_response.raise_for_status()
+            except Exception as e:
+                print(f"PD service error: {e}")
+                sources["pd"] = 0
 
-        try:
-            ad_response = await client.post(f"{AMP_AD_URL}/search", json=request.model_dump())
-            if ad_response.status_code == 200:
-                ad_data = ad_response.json()["data"]
-                sources["ad"] = len(ad_data)
-            elif ad_response.status_code == 403:
-                sources["ad"] = 403
-            else:
-                ad_response.raise_for_status()
-        except Exception as e:
-            print(f"AD service error: {e}")
-            sources["ad"] = 0
+            try:
+                ad_response = await client.post(f"{AMP_AD_URL}/search", json=request.model_dump())
+                if ad_response.status_code == 200:
+                    ad_data = ad_response.json()["data"]
+                    sources["ad"] = len(ad_data)
+                elif ad_response.status_code == 403:
+                    sources["ad"] = 403
+                else:
+                    ad_response.raise_for_status()
+            except Exception as e:
+                print(f"AD service error: {e}")
+                sources["ad"] = 0
 
     all_data = public_data + pd_data + ad_data
 
@@ -108,6 +121,9 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
     if pd_restricted:
         for field, reason in pd_restricted.items():
             restricted_fields.setdefault(field, []).append({"source": "pd", "reason": reason})
+    if public_restricted:
+        for field, reason in public_restricted.items():
+            restricted_fields.setdefault(field, []).append({"source": "public", "reason": reason})
 
 
     def infer_type(value):
@@ -161,6 +177,10 @@ async def get_drs_object(
     object_id: str = Path(..., description="Unique identifier for the DRS object"),
     user=Depends(get_current_user)
 ):
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+        )
     DRS_OBJECTS = {
         "xyz001": "ad_sample1.bam",
         "xyz002": "ad_sample2.bam",

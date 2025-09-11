@@ -155,12 +155,16 @@ SELECT * FROM person LIMIT 10;
       responsePre.textContent = '';
 
       try {
+        const headers = {
+          'Content-Type': 'application/json'
+        };
+        if (accessToken) {
+          headers.Authorization = `Bearer ${accessToken}`;
+        }
+
         const res = await fetch('/search', {
           method: 'POST',
-          headers: { 
-            "Authorization": `Bearer ${accessToken}`,
-            'Content-Type': 'application/json' 
-          },
+          headers: headers,
           body: JSON.stringify(data)
         });
 
