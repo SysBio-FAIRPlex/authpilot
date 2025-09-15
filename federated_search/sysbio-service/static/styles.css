@@ -97,10 +97,14 @@ th {
   background-color: #f0f0f0;
 }
 
-.restricted-cell {
+.controlled-access-cell {
   background-color: #fff4f4;
   color: #aa0000;
-  font-style: italic;
+}
+
+.registered-access-cell {
+  background-color: #fffbea;
+  color: #7c5100;
 }
 
 .spinner {

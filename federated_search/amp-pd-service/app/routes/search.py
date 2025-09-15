@@ -10,13 +10,25 @@ router = APIRouter()
 
 @router.post("/search", response_model=dict)
 def run_query(request: SearchRequest, db: Session = Depends(get_db)):
-    pd_access = request.parameters.get("pd_access", False) if isinstance(request.parameters, dict) else False
-    if not pd_access:
-        return error_response(403, title="Unauthorized", detail=f"Unauthorized to PD")
+    access_tier = "public"
+    if isinstance(request.parameters, dict):
+        access_tier = request.parameters.get("access_tier", "public")
 
-    restricted_fields = {
-        "year_of_birth": "Restricted to approved researchers"
-    }
+    # Define fields restricted by access tier
+    restricted_fields = {}
+    if access_tier == "public":
+        restricted_fields = {
+            "gender": "registered access only",
+            "race": "registered access only",
+            "ethnicity": "registered access only",
+            "year_of_birth": "controlled access only"
+        }
+    elif access_tier == "registered":
+        restricted_fields = {
+            "year_of_birth": "controlled access only"
+        }
+    elif access_tier != "controlled":
+        return error_response(400, title="Bad Request", detail="Invalid access_tier specified.")
 
     try:
         stmt = text(request.query)

@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
 from app.dependencies import get_db
-from app.models import Person
+from app.models.person import Person
 from main import app
 
 from sqlalchemy.pool import StaticPool
@@ -49,10 +49,64 @@ def create_test_db():
 
 client = TestClient(app)
 
-def test_search_query():
-    # TODO: Relevant search query
-    payload = {"sql": "SELECT * FROM foo"}
+
+def test_public_search_query():
+    payload = {"query": "SELECT * FROM person", "parameters": {"access_tier": "public"}}
     response = client.post("/search", json=payload)
     assert response.status_code == 200
-    assert "columns" in response.json()
-    assert "rows" in response.json()
+    json_response = response.json()
+    assert "data" in json_response
+    assert len(json_response["data"]) == 1
+    # Public should only see person_id and diagnosis_name
+    assert "person_id" in json_response["data"][0]
+    assert "diagnosis_name" in json_response["data"][0]
+    assert "gender" not in json_response["data"][0]
+    assert "year_of_birth" not in json_response["data"][0]
+
+    assert "restricted_fields" in json_response
+    assert "gender" in json_response["restricted_fields"]
+    assert "year_of_birth" in json_response["restricted_fields"]
+
+
+def test_registered_search_query():
+    payload = {"query": "SELECT * FROM person", "parameters": {"access_tier": "registered"}}
+    response = client.post("/search", json=payload)
+    assert response.status_code == 200
+    json_response = response.json()
+    assert "data" in json_response
+    assert len(json_response["data"]) == 1
+    # Registered should see demographic data, but not year_of_birth
+    assert "person_id" in json_response["data"][0]
+    assert "gender" in json_response["data"][0]
+    assert "race" in json_response["data"][0]
+    assert "ethnicity" in json_response["data"][0]
+    assert "year_of_birth" not in json_response["data"][0]
+
+    assert "restricted_fields" in json_response
+    assert "gender" not in json_response["restricted_fields"]
+    assert "year_of_birth" in json_response["restricted_fields"]
+
+
+def test_controlled_search_query():
+    payload = {"query": "SELECT * FROM person", "parameters": {"access_tier": "controlled"}}
+    response = client.post("/search", json=payload)
+    assert response.status_code == 200
+    json_response = response.json()
+    assert "data" in json_response
+    assert len(json_response["data"]) == 1
+    # Controlled should see all fields
+    assert "person_id" in json_response["data"][0]
+    assert "gender" in json_response["data"][0]
+    assert "year_of_birth" in json_response["data"][0]
+
+    assert "restricted_fields" in json_response
+    assert not json_response["restricted_fields"]
+
+
+def test_invalid_tier_search_query():
+    payload = {"query": "SELECT * FROM person", "parameters": {"access_tier": "invalid_tier"}}
+    response = client.post("/search", json=payload)
+    assert response.status_code == 400
+    json_response = response.json()
+    assert "errors" in json_response
+    assert json_response["errors"][0]["title"] == "Bad Request"

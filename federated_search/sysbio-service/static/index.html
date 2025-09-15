@@ -17,9 +17,19 @@
     </div>
     <div class="checkbox-group">
       <p class="explanation">
-        The follow checkboxes "mock" access to AMP PD and AMP AD. In reality, access to the dataset are tied to the user's credentials.</p>
-      <label><input type="checkbox" id="box1"> Simulate AMP PD Access</label><br>
-      <label><input type="checkbox" id="box2"> Simulate AMP AD Access</label><br>
+        The follow dropdowns "mock" access to AMP PD and AMP AD. In reality, access to the dataset are tied to the user's credentials, but this UI allows a demonstrator to simulate different access levels.</p>
+      <label for="pd-tier">AMP PD Access Tier:</label>
+      <select id="pd-tier">
+        <option value="public">Public</option>
+        <option value="registered">Registered</option>
+        <option value="controlled">Controlled</option>
+      </select><br>
+      <label for="ad-tier">AMP AD Access Tier:</label>
+      <select id="ad-tier">
+        <option value="public">Public</option>
+        <option value="registered">Registered</option>
+        <option value="controlled">Controlled</option>
+      </select><br>
     </div>
 
     <textarea id="sql" placeholder="Enter SQL query..." rows="5" style="width: 100%;">
@@ -141,8 +151,8 @@ SELECT * FROM person LIMIT 10;
       const data = {
         query: document.getElementById('sql').value,
         parameters: {
-          pd_access: document.getElementById('box1').checked,
-          ad_access: document.getElementById('box2').checked
+          pd_access_tier: document.getElementById('pd-tier').value,
+          ad_access_tier: document.getElementById('ad-tier').value
         }
       };
 
@@ -154,13 +164,17 @@ SELECT * FROM person LIMIT 10;
       tableContainer.innerHTML = '';
       responsePre.textContent = '';
 
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
+
       try {
         const res = await fetch('/search', {
           method: 'POST',
-          headers: { 
-            "Authorization": `Bearer ${accessToken}`,
-            'Content-Type': 'application/json' 
-          },
+          headers: headers,
           body: JSON.stringify(data)
         });
 
@@ -215,10 +229,21 @@ SELECT * FROM person LIMIT 10;
                 td.textContent = row[col];
               } else if (restrictions[col]) {
                 const reasons = Array.isArray(restrictions[col])
-                  ? restrictions[col].map(r => `${r.reason}`).join('; ')
+                  ? [...new Set(restrictions[col].map(r => r.reason))].join('; ')
                   : restrictions[col];
-                td.textContent = `<PROTECTED> ${reasons}`;
-                td.classList.add('restricted-cell');
+
+                let prefix = '';
+                if (reasons.includes('controlled')) {
+                  prefix = '🔐 ';
+                  td.classList.add('controlled-access-cell');
+                } else if (reasons.includes('registered')) {
+                  prefix = '👤 ';
+                  td.classList.add('registered-access-cell');
+                } else {
+                  td.classList.add('controlled-access-cell');
+                }
+                
+                td.textContent = `${prefix} ${reasons}`;
               } else {
                 td.textContent = '';
               }
