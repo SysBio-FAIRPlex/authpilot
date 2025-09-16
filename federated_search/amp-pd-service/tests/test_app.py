@@ -68,9 +68,28 @@ def test_public_search_query():
     assert "year_of_birth" in json_response["restricted_fields"]
 
 
-def test_registered_search_query():
+def test_registered_search_query_unauthenticated():
     payload = {"query": "SELECT * FROM person", "parameters": {"access_tier": "registered"}}
     response = client.post("/search", json=payload)
+    assert response.status_code == 200
+    json_response = response.json()
+    assert "data" in json_response
+    assert len(json_response["data"]) == 1
+    # Unauthenticated registered should only see public data
+    assert "person_id" in json_response["data"][0]
+    assert "diagnosis_name" in json_response["data"][0]
+    assert "gender" not in json_response["data"][0]
+    assert "year_of_birth" not in json_response["data"][0]
+
+    assert "restricted_fields" in json_response
+    assert "gender" in json_response["restricted_fields"]
+    assert "year_of_birth" in json_response["restricted_fields"]
+
+
+def test_registered_search_query_authenticated():
+    payload = {"query": "SELECT * FROM person", "parameters": {"access_tier": "registered"}}
+    headers = {"Authorization": "Bearer fake-token"}
+    response = client.post("/search", json=payload, headers=headers)
     assert response.status_code == 200
     json_response = response.json()
     assert "data" in json_response
@@ -87,9 +106,28 @@ def test_registered_search_query():
     assert "year_of_birth" in json_response["restricted_fields"]
 
 
-def test_controlled_search_query():
+def test_controlled_search_query_unauthenticated():
     payload = {"query": "SELECT * FROM person", "parameters": {"access_tier": "controlled"}}
     response = client.post("/search", json=payload)
+    assert response.status_code == 200
+    json_response = response.json()
+    assert "data" in json_response
+    assert len(json_response["data"]) == 1
+    # Unauthenticated controlled should only see public data
+    assert "person_id" in json_response["data"][0]
+    assert "diagnosis_name" in json_response["data"][0]
+    assert "gender" not in json_response["data"][0]
+    assert "year_of_birth" not in json_response["data"][0]
+
+    assert "restricted_fields" in json_response
+    assert "gender" in json_response["restricted_fields"]
+    assert "year_of_birth" in json_response["restricted_fields"]
+
+
+def test_controlled_search_query_authenticated():
+    payload = {"query": "SELECT * FROM person", "parameters": {"access_tier": "controlled"}}
+    headers = {"Authorization": "Bearer fake-token"}
+    response = client.post("/search", json=payload, headers=headers)
     assert response.status_code == 200
     json_response = response.json()
     assert "data" in json_response

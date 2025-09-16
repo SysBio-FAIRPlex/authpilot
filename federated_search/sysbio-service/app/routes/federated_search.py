@@ -80,7 +80,6 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
 
     pd_data, ad_data = [], []
     pd_restricted, ad_restricted = {}, {}
-    sources = {"public": len(public_data)}
 
     auth_header = fastapi_request.headers.get("Authorization")
     headers = {}
@@ -106,14 +105,12 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
                 pd_json = pd_response.json()
                 pd_data = pd_json.get("data", [])
                 pd_restricted = pd_json.get("restricted_fields", {})
-                sources["pd"] = len(pd_data)
             elif pd_response.status_code == 403:
-                sources["pd"] = 403
+                pass
             else:
                 pd_response.raise_for_status()
         except Exception as e:
             print(f"PD service error: {e}")
-            sources["pd"] = 0
 
         try:
             ad_response = await client.post(f"{AMP_AD_URL}/search", json=ad_request_payload, headers=headers)
@@ -121,14 +118,12 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
                 ad_json = ad_response.json()
                 ad_data = ad_json.get("data", [])
                 ad_restricted = ad_json.get("restricted_fields", {})
-                sources["ad"] = len(ad_data)
             elif ad_response.status_code == 403:
-                sources["ad"] = 403
+                pass
             else:
                 ad_response.raise_for_status()
         except Exception as e:
             print(f"AD service error: {e}")
-            sources["ad"] = 0
 
     all_data = public_data + pd_data + ad_data
 
@@ -173,7 +168,6 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
     return {
         "data_model": data_model,
         "data": all_data,
-        "sources": sources,
         "restricted_fields": restricted_fields,
         "pagination": {
             "next_page_url": next_page_url

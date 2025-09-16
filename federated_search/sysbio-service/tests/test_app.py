@@ -31,8 +31,6 @@ async def test_successful_public_query():
 
     assert response.status_code == 200
     body = response.json()
-    assert body["sources"]["pd"] == 1
-    assert body["sources"]["ad"] == 1
     
     # Check that downstream services were called correctly
     pd_request_body = json.loads(pd_route.calls.last.request.content)
