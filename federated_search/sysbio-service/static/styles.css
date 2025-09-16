@@ -63,6 +63,15 @@ h1 {
   color: #333;
 }
 
+summary {
+  cursor: pointer;
+  font-weight: bold;
+  margin: 40px 0 10px 0;
+  font-size: 1.17em;
+  color: #333;
+  font-family: monospace;
+}
+
 .checkbox-group {
   margin-bottom: 20px;
   display: inline-block;
@@ -181,8 +190,8 @@ th {
 
 .modal-content {
   background-color: #fff;
-  padding: 20px 30px;
+  padding: 30px 45px;
   border-radius: 8px;
-  max-width: 500px;
+  max-width: 750px;
   text-align: center;
 }

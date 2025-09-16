@@ -9,18 +9,21 @@
 <body>
   <div id="disclaimer-modal" class="modal-overlay">
     <div class="modal-content">
-      <h2>Disclaimer</h2>
-      <p>This is a demonstration of federated search capabilities. The data presented is synthetic and for illustrative purposes only. Do not use this for any real-world analysis or decision-making.</p>
+      <h2>⚠️ Synthetic Data for Demo Purposes Only ⚠️</h2>
+      <p>This is a toy page intended to demonstrate the backend APIs that are being built. The actual frontend capabilities are to provided by other tools like FAIRkit and Workbench.</p>
+      <p><strong>Any resemblance to real AMP data is purely coincidental.</strong></p>
       <button id="accept-disclaimer">Accept</button>
     </div>
   </div>
   <div class="main-container">
     <div class="panel left-panel">
-      <h2>Combined Results</h2>
-      <div id="table-container">Query results will appear here after you submit a query.</div>
+      <h2>Example UI</h2>
+      <div id="table-container"><em>Combined results from each AMP will appear here after you submit a query.</em></div>
 
-      <h2>Raw JSON Response</h2>
-      <pre id="response">JSON response will appear here after you submit a query.</pre>
+      <details id="raw-json-response-container" style="display: none;">
+        <summary>Raw JSON Response</summary>
+        <pre id="response">JSON response will appear here after you submit a query.</pre>
+      </details>
     </div>
 
     <div class="panel right-panel">
@@ -34,16 +37,16 @@
       <div class="auth-sim-container">
         <div class="auth-sim-controls">
           <div>
-            <label for="pd-tier">AMP PD Access Tier:</label>
-            <select id="pd-tier">
+            <label for="ad-tier">AMP AD Access Tier:</label>
+            <select id="ad-tier">
               <option value="public">Public</option>
               <option value="registered">Registered</option>
               <option value="controlled">Controlled</option>
             </select>
           </div>
           <div>
-            <label for="ad-tier">AMP AD Access Tier:</label>
-            <select id="ad-tier">
+            <label for="pd-tier">AMP PD Access Tier:</label>
+            <select id="pd-tier">
               <option value="public">Public</option>
               <option value="registered">Registered</option>
               <option value="controlled">Controlled</option>
@@ -169,9 +172,11 @@ SELECT * FROM person LIMIT 1;
 
       const tableContainer = document.getElementById('table-container');
       const responsePre = document.getElementById('response');
+      const rawJsonResponseContainer = document.getElementById('raw-json-response-container');
 
       tableContainer.innerHTML = '';
       responsePre.textContent = '';
+      rawJsonResponseContainer.style.display = 'block';
 
       const headers = {
         'Content-Type': 'application/json'
