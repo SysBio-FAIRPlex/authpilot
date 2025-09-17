@@ -105,8 +105,6 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
                 pd_json = pd_response.json()
                 pd_data = pd_json.get("data", [])
                 pd_restricted = pd_json.get("restricted_fields", {})
-            elif pd_response.status_code == 403:
-                pass
             else:
                 pd_response.raise_for_status()
         except Exception as e:
@@ -118,8 +116,6 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
                 ad_json = ad_response.json()
                 ad_data = ad_json.get("data", [])
                 ad_restricted = ad_json.get("restricted_fields", {})
-            elif ad_response.status_code == 403:
-                pass
             else:
                 ad_response.raise_for_status()
         except Exception as e:
