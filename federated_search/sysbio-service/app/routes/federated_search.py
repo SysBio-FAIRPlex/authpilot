@@ -89,6 +89,12 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
     pdrd_access_tier = params.get("pdrd_access_tier", "public")
     ad_access_tier = params.get("ad_access_tier", "public")
 
+    # WARNING: in this demo, the downstream AMP services still accept raw SQL queries on their /search endpoints.
+    # this puts them at risk of SQL injection attacks.
+    # This top-level "sysbio-service" implements a strategy for protecting against SQL injection,
+    # but all the AMP services would need to take that vulnerability into account.
+    # ~~~
+    # TODO: update the downstream AMP service /search endpoints to protect against SQL injection.
     pd_request_payload = {
         "query": request.query,
         "parameters": {"access_tier": pdrd_access_tier}
@@ -141,14 +147,44 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
             return "boolean"
         return "string"
 
+    # Canonical order to ensure stable column sorting across all queries
+    CANONICAL_FIELD_ORDER = [
+        # identifiers
+        "ID", "person_id", "drs_url",
+        # general
+        "source",
+        "description",
+        # synthetic_dataset
+        "dataset", "status", "sex", "age_at_sampling", "age_at_death",
+        "APOE4_compund_genotype", "time_from_baseline", "repository_link",
+        # person
+        "gender", "year_of_birth", "race", "ethnicity", "diagnosis_name",
+        # synthetic_files
+        "filename", "filesize_bytes",
+    ]
+
+    all_present_fields = set()
     if all_data:
-        first_row = all_data[0]
+        all_present_fields.update(all_data[0].keys())
+    all_present_fields.update(restricted_fields.keys())
+
+    # Filter and order the fields based on the canonical list
+    ordered_keys = [field for field in CANONICAL_FIELD_ORDER if field in all_present_fields]
+
+    # Add any fields that are not in the canonical list to the end, sorted alphabetically
+    # for stable ordering of new, unknown fields.
+    for field in sorted(list(all_present_fields)):
+        if field not in ordered_keys:
+            ordered_keys.append(field)
+
+    if ordered_keys:
+        first_row = all_data[0] if all_data else {}
         data_model = {
             "type": "object",
             "properties": {
-                key: {"type": infer_type(value)} for key, value in first_row.items()
+                key: {"type": infer_type(first_row.get(key))} for key in ordered_keys
             },
-            "required": list(first_row.keys())
+            "required": ordered_keys
         }
     else:
         data_model = {"type": "object", "properties": {}}
