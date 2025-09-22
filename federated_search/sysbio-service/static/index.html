@@ -65,8 +65,10 @@
           <option value="synthetic_dataset">synthetic_dataset</option>
           <option value="synthetic_files">synthetic_files</option>
         </select>
-        <label for="id-filter" style="display: block; margin-bottom: 5px;">Filter by ID (optional):</label>
-        <input type="text" id="id-filter" placeholder="e.g., 3001 for person" style="width: calc(100% - 12px); padding: 5px;">
+        <label for="column-select" style="display: block; margin-bottom: 5px;">Filter by column (optional):</label>
+        <select id="column-select" style="width: 100%; padding: 5px; margin-bottom: 10px;"></select>
+        <label for="filter-value" style="display: block; margin-bottom: 5px;">Filter value:</label>
+        <input type="text" id="filter-value" style="width: calc(100% - 12px); padding: 5px;">
         <label for="limit-input" style="display: block; margin-bottom: 5px; margin-top: 10px;">Limit:</label>
         <input type="number" id="limit-input" value="1" style="width: calc(100% - 12px); padding: 5px;">
       </div>
@@ -95,6 +97,31 @@
       }
       return truncated;
     }
+
+    // TODO: this shouldn't be hardcoded
+    const tableColumns = {
+      person: ['person_id', 'gender', 'year_of_birth', 'race', 'ethnicity', 'diagnosis_name'],
+      synthetic_dataset: ['ID', 'dataset', 'status', 'sex', 'age_at_sampling', 'age_at_death', 'APOE4_compund_genotype', 'time_from_baseline', 'repository_link'],
+      synthetic_files: ['drs_url', 'filename', 'filesize_bytes', 'description']
+    };
+
+    function updateColumnSelect() {
+      const tableSelect = document.getElementById('table-select');
+      const columnSelect = document.getElementById('column-select');
+      const selectedTable = tableSelect.value;
+
+      columnSelect.innerHTML = '<option value="">-- No filter --</option>';
+
+      if (tableColumns[selectedTable]) {
+        tableColumns[selectedTable].forEach(column => {
+          const option = document.createElement('option');
+          option.value = column;
+          option.textContent = column;
+          columnSelect.appendChild(option);
+        });
+      }
+    }
+
     function logout() {
       sessionStorage.removeItem("oauth_state");
       window.location.href = window.location.origin;
@@ -172,18 +199,17 @@
     
     async function sendSearchRequest() {
       const tableName = document.getElementById('table-select').value;
-      const idFilter = document.getElementById('id-filter').value.trim();
+      const filterColumn = document.getElementById('column-select').value;
+      const filterValue = document.getElementById('filter-value').value.trim();
       const limit = document.getElementById('limit-input').value;
 
-      let query = `SELECT * FROM ${tableName} LIMIT ${limit}`;
-
-      if (tableName === 'person' && idFilter) {
-        query = `SELECT * FROM person WHERE person_id = ${idFilter} LIMIT ${limit}`;
-      } else if (tableName === 'synthetic_dataset' && idFilter) {
-        query = `SELECT * FROM synthetic_dataset WHERE ID = '${idFilter}' LIMIT ${limit}`;
-      } else if (tableName === 'synthetic_files' && idFilter) {
-        query = `SELECT * FROM synthetic_files WHERE drs_url = '${idFilter}' LIMIT ${limit}`;
+      let query = `SELECT * FROM ${tableName}`;
+      if (filterColumn && filterValue) {
+        const numericColumns = ['person_id', 'year_of_birth', 'age_at_sampling', 'age_at_death', 'APOE4_compund_genotype', 'filesize_bytes', 'time_from_baseline'];
+        const value = numericColumns.includes(filterColumn) ? filterValue : `'${filterValue}'`;
+        query += ` WHERE ${filterColumn} = ${value}`;
       }
+      query += ` LIMIT ${limit}`;
       
       const data = {
         query: query,
@@ -296,6 +322,10 @@
         modal.style.display = 'none';
         sessionStorage.setItem('disclaimerAccepted', 'true');
       });
+
+      const tableSelect = document.getElementById('table-select');
+      tableSelect.addEventListener('change', updateColumnSelect);
+      updateColumnSelect();
     });
   </script>
 </body>
