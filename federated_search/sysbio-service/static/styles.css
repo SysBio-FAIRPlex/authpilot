@@ -25,6 +25,7 @@ body {
 
 .left-panel {
   flex: 3;
+  min-width: 0;
 }
 
 .right-panel {

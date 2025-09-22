@@ -58,9 +58,18 @@
         <h2>API query</h2>
         <button onclick="sendSearchRequest()">Submit</button>
       </div>
-      <textarea id="sql" placeholder="Enter SQL query..." rows="5" style="width: 100%;">
-SELECT * FROM person LIMIT 1;
-      </textarea>
+      <div style="margin-top: 10px;">
+        <label for="table-select" style="display: block; margin-bottom: 5px;">Table:</label>
+        <select id="table-select" style="width: 100%; padding: 5px; margin-bottom: 10px;">
+          <option value="person" selected>person</option>
+          <option value="synthetic_dataset">synthetic_dataset</option>
+          <option value="synthetic_files">synthetic_files</option>
+        </select>
+        <label for="id-filter" style="display: block; margin-bottom: 5px;">Filter by ID (optional):</label>
+        <input type="text" id="id-filter" placeholder="e.g., 3001 for person" style="width: calc(100% - 12px); padding: 5px;">
+        <label for="limit-input" style="display: block; margin-bottom: 5px; margin-top: 10px;">Limit:</label>
+        <input type="number" id="limit-input" value="1" style="width: calc(100% - 12px); padding: 5px;">
+      </div>
     </div>
   </div>
 
@@ -162,8 +171,22 @@ SELECT * FROM person LIMIT 1;
     updateLoginButton();
     
     async function sendSearchRequest() {
+      const tableName = document.getElementById('table-select').value;
+      const idFilter = document.getElementById('id-filter').value.trim();
+      const limit = document.getElementById('limit-input').value;
+
+      let query = `SELECT * FROM ${tableName} LIMIT ${limit}`;
+
+      if (tableName === 'person' && idFilter) {
+        query = `SELECT * FROM person WHERE person_id = ${idFilter} LIMIT ${limit}`;
+      } else if (tableName === 'synthetic_dataset' && idFilter) {
+        query = `SELECT * FROM synthetic_dataset WHERE ID = '${idFilter}' LIMIT ${limit}`;
+      } else if (tableName === 'synthetic_files' && idFilter) {
+        query = `SELECT * FROM synthetic_files WHERE drs_url = '${idFilter}' LIMIT ${limit}`;
+      }
+      
       const data = {
-        query: document.getElementById('sql').value,
+        query: query,
         parameters: {
           pdrd_access_tier: document.getElementById('pdrd-tier').value,
           ad_access_tier: document.getElementById('ad-tier').value
