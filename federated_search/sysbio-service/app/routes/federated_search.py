@@ -1,5 +1,5 @@
 import re
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends, HTTPException, Path, status, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -9,7 +9,7 @@ from app.utils.error_utils import error_response
 from app.dependencies import get_db
 from app.schemas import SearchRequest
 from jose import jwt, JWTError
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import httpx
 import os
 
@@ -17,6 +17,7 @@ router = APIRouter()
 JWT_SECRET = os.getenv("JWT_SECRET", os.getenv("SECRET_KEY"))
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 AMP_PD_URL = os.getenv("AMP_PD_URL")
 AMP_AD_URL = os.getenv("AMP_AD_URL")
@@ -29,6 +30,15 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
     return payload
 
+def get_optional_current_user(token: Optional[str] = Depends(optional_oauth2_scheme)):
+    if token is None:
+        return None
+    assert JWT_SECRET is not None
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+    except JWTError:
+        return None
+
 @router.post(
     "/search",
     response_model=dict,
@@ -37,7 +47,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         500: {"model": ErrorResponse, "description": "Internal server error"},
     }
 )
-async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=Depends(get_current_user)):
+async def run_query(fastapi_request: Request, request: SearchRequest, db: Session = Depends(get_db), user: Optional[dict] = Depends(get_optional_current_user)):
     # Prepare parameter dict
     if isinstance(request.parameters, dict):
         params: Dict[str, Any] = request.parameters.copy()
@@ -69,45 +79,57 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
         return error_response(400, title="Invalid SQL", detail=f"Invalid SQL: {e}")
 
     pd_data, ad_data = [], []
-    pd_restricted = {}
-    sources = {"public": len(public_data)}
+    pd_restricted, ad_restricted = {}, {}
+
+    auth_header = fastapi_request.headers.get("Authorization")
+    headers = {}
+    if auth_header:
+        headers["Authorization"] = auth_header
+
+    pd_access_tier = params.get("pd_access_tier", "public")
+    ad_access_tier = params.get("ad_access_tier", "public")
+
+    pd_request_payload = {
+        "query": request.query,
+        "parameters": {"access_tier": pd_access_tier}
+    }
+    ad_request_payload = {
+        "query": request.query,
+        "parameters": {"access_tier": ad_access_tier}
+    }
 
     async with httpx.AsyncClient() as client:
         try:
-            pd_response = await client.post(f"{AMP_PD_URL}/search", json=request.model_dump())
+            pd_response = await client.post(f"{AMP_PD_URL}/search", json=pd_request_payload, headers=headers)
             if pd_response.status_code == 200:
                 pd_json = pd_response.json()
                 pd_data = pd_json.get("data", [])
                 pd_restricted = pd_json.get("restricted_fields", {})
-
-                sources["pd"] = len(pd_data)
-            elif pd_response.status_code == 403:
-                sources["pd"] = 403
             else:
                 pd_response.raise_for_status()
         except Exception as e:
             print(f"PD service error: {e}")
-            sources["pd"] = 0
 
         try:
-            ad_response = await client.post(f"{AMP_AD_URL}/search", json=request.model_dump())
+            ad_response = await client.post(f"{AMP_AD_URL}/search", json=ad_request_payload, headers=headers)
             if ad_response.status_code == 200:
-                ad_data = ad_response.json()["data"]
-                sources["ad"] = len(ad_data)
-            elif ad_response.status_code == 403:
-                sources["ad"] = 403
+                ad_json = ad_response.json()
+                ad_data = ad_json.get("data", [])
+                ad_restricted = ad_json.get("restricted_fields", {})
             else:
                 ad_response.raise_for_status()
         except Exception as e:
             print(f"AD service error: {e}")
-            sources["ad"] = 0
 
     all_data = public_data + pd_data + ad_data
 
     restricted_fields = {}
     if pd_restricted:
         for field, reason in pd_restricted.items():
-            restricted_fields.setdefault(field, []).append({"source": "pd", "reason": reason})
+            restricted_fields.setdefault(field.lower(), []).append({"source": "pd", "reason": reason})
+    if ad_restricted:
+        for field, reason in ad_restricted.items():
+            restricted_fields.setdefault(field.lower(), []).append({"source": "ad", "reason": reason})
 
 
     def infer_type(value):
@@ -142,7 +164,6 @@ async def run_query(request: SearchRequest, db: Session = Depends(get_db), user=
     return {
         "data_model": data_model,
         "data": all_data,
-        "sources": sources,
         "restricted_fields": restricted_fields,
         "pagination": {
             "next_page_url": next_page_url

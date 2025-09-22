@@ -7,41 +7,61 @@
   <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
 </head>
 <body>
-  <div class="container">
-    <h1>Federated Search API Demo</h1>
-    <div id="login-status" style="margin-bottom: 1em;"></div>
-    <div id="userinfo-output" style="margin-top: 1em;"></div>
-    <div class="checkbox-group">
-    <p class="explanation">
-    This is a toy page intended to demonstrate the backend APIs that are being built. The actual frontend capabilities are to provided by other tools like FAIRkit and Workbench. The data returned by the backend is currently all synthetic.</p>
+  <div id="disclaimer-modal" class="modal-overlay">
+    <div class="modal-content">
+      <h2>⚠️ Synthetic Data for Demo Purposes Only ⚠️</h2>
+      <p>This is a toy page intended to demonstrate the backend APIs that are being built. The actual frontend capabilities are to provided by other tools like FAIRkit and Workbench.</p>
+      <p><strong>Any resemblance to real AMP data is purely coincidental.</strong></p>
+      <button id="accept-disclaimer">Accept</button>
     </div>
-    <div class="checkbox-group">
-      <p class="explanation">
-        The follow checkboxes "mock" access to AMP PD and AMP AD. In reality, access to the dataset are tied to the user's credentials.</p>
-      <label><input type="checkbox" id="box1"> Simulate AMP PD Access</label><br>
-      <label><input type="checkbox" id="box2"> Simulate AMP AD Access</label><br>
-    </div>
+  </div>
+  <div class="main-container">
+    <div class="panel left-panel">
+      <h2>Example UI</h2>
+      <div id="table-container"><em>Combined results from each AMP will appear here after you submit a query.</em></div>
 
-    <textarea id="sql" placeholder="Enter SQL query..." rows="5" style="width: 100%;">
-SELECT * FROM person LIMIT 10;
-    </textarea><br>
-
-    <div>
-      <button onclick="sendSearchRequest()">Submit</button>
+      <details id="raw-json-response-container" style="display: none;">
+        <summary>Raw JSON Response</summary>
+        <pre id="response">JSON response will appear here after you submit a query.</pre>
+      </details>
     </div>
 
-    <h2>Federated Sources Contacted</h2>
-    <div id="sources"></div>
-
-    <h2>Combined Results</h2>
-    <div style="margin-top: 1em;">
-      <button onclick="copyTableToClipboard()">Copy to Clipboard</button>
-      <span id="copy-status" style="margin-left: 1em; color: green;"></span>
+    <div class="panel right-panel">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Authentication</h2>
+        <div id="auth-button-container"></div>
+      </div>
+      <div id="login-status" style="margin-bottom: 1em;"></div>
+      <div id="userinfo-output" style="margin-top: 1em;"></div>
+      <h2>Authorization</h2>
+      <div class="auth-sim-container">
+        <div class="auth-sim-controls">
+          <div>
+            <label for="ad-tier">AMP AD Access Tier:</label>
+            <select id="ad-tier">
+              <option value="public">Public</option>
+              <option value="registered">Registered</option>
+              <option value="controlled">Controlled</option>
+            </select>
+          </div>
+          <div>
+            <label for="pd-tier">AMP PD Access Tier:</label>
+            <select id="pd-tier">
+              <option value="public">Public</option>
+              <option value="registered">Registered</option>
+              <option value="controlled">Controlled</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>API query</h2>
+        <button onclick="sendSearchRequest()">Submit</button>
+      </div>
+      <textarea id="sql" placeholder="Enter SQL query..." rows="5" style="width: 100%;">
+SELECT * FROM person LIMIT 1;
+      </textarea>
     </div>
-    <div id="table-container"></div>
-
-    <h2>Raw JSON Response</h2>
-    <pre id="response"></pre>
   </div>
 
   <script>
@@ -80,6 +100,7 @@ SELECT * FROM person LIMIT 10;
     })();
     async function updateLoginButton() {
       const loginDiv = document.getElementById("login-status");
+      const authButtonContainer = document.getElementById("auth-button-container");
       const userinfoDiv = document.getElementById("userinfo-output");
       loginDiv.innerHTML = `
         <div>
@@ -87,6 +108,7 @@ SELECT * FROM person LIMIT 10;
           <span class="loading-text">Loading login status...</span>
         </div>
       `;
+      authButtonContainer.innerHTML = "";
       userinfoDiv.innerHTML = "";
 
       try {
@@ -97,13 +119,13 @@ SELECT * FROM person LIMIT 10;
 
         if (json?.user && json?.access_token) {
           truncatedJson = truncateValues(json, 35);
+          authButtonContainer.innerHTML = `<button onclick="logout()">Logout</button>`;
           loginDiv.innerHTML = `
-            <strong>Authenticated User:</strong>
             <pre class="json-output">${JSON.stringify(truncatedJson, null, 2)}</pre>
-            <br>
-            <button onclick="logout()">Logout</button>
           `;
           accessToken = json.access_token;
+          document.getElementById('pd-tier').disabled = false;
+          document.getElementById('ad-tier').disabled = false;
 
           // Fetch userinfo
           const userinfoRes = await fetch(`${AUTH_BASE}/userinfo`, {
@@ -124,11 +146,13 @@ SELECT * FROM person LIMIT 10;
             userinfoDiv.innerHTML = `<strong>/userinfo:</strong> Error ${userinfoRes.status}`;
           }
         } else {
+          authButtonContainer.innerHTML = `<button onclick="window.location.href='${AUTH_BASE}/login?state=${state}&redirect_uri=${encodeURIComponent(window.location.href)}'">Login with Google</button>`;
           loginDiv.innerHTML = `
-            <button onclick="logout()">Clear cache and refresh</button>
-            <button onclick="window.location.href='${AUTH_BASE}/login?state=${state}&redirect_uri=${encodeURIComponent(window.location.href)}'">Login with Google</button>
+            <pre class="json-output">${JSON.stringify({ user: "Not logged in" }, null, 2)}</pre>
           `;
           userinfoDiv.innerHTML = "";
+          document.getElementById('pd-tier').disabled = true;
+          document.getElementById('ad-tier').disabled = true;
         }
       } catch (err) {
         console.error("Login status check failed:", err);
@@ -141,46 +165,35 @@ SELECT * FROM person LIMIT 10;
       const data = {
         query: document.getElementById('sql').value,
         parameters: {
-          pd_access: document.getElementById('box1').checked,
-          ad_access: document.getElementById('box2').checked
+          pd_access_tier: document.getElementById('pd-tier').value,
+          ad_access_tier: document.getElementById('ad-tier').value
         }
       };
 
-      const sourcesDiv = document.getElementById('sources');
       const tableContainer = document.getElementById('table-container');
       const responsePre = document.getElementById('response');
+      const rawJsonResponseContainer = document.getElementById('raw-json-response-container');
 
-      sourcesDiv.innerHTML = 'Loading...';
       tableContainer.innerHTML = '';
       responsePre.textContent = '';
+      rawJsonResponseContainer.style.display = 'block';
+
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+      if (accessToken) {
+        headers['Authorization'] = `Bearer ${accessToken}`;
+      }
 
       try {
         const res = await fetch('/search', {
           method: 'POST',
-          headers: { 
-            "Authorization": `Bearer ${accessToken}`,
-            'Content-Type': 'application/json' 
-          },
+          headers: headers,
           body: JSON.stringify(data)
         });
 
         const json = await res.json();
         responsePre.textContent = JSON.stringify(json, null, 2);
-
-        // Show sources (assumes sysbio-service includes `sources` in its response)
-        if (json.sources) {
-          const labels = { pd: "AMP PD", ad: "AMP AD" };
-          const sourceRows = Object.entries(labels).map(([key, label]) => {
-            const value = json.sources[key];
-            if (value === 403) return `${label} ❌ Unauthorized`;
-            if (value != null) return `${label} ✅ (rows: ${value})`;
-            return null;
-          }).filter(Boolean);
-
-          sourcesDiv.innerHTML = sourceRows.join('<br>') || 'None';
-        } else {
-          sourcesDiv.innerHTML = 'N/A';
-        }
 
         // Build results table
         if (json.data_model && json.data) {
@@ -215,10 +228,21 @@ SELECT * FROM person LIMIT 10;
                 td.textContent = row[col];
               } else if (restrictions[col]) {
                 const reasons = Array.isArray(restrictions[col])
-                  ? restrictions[col].map(r => `${r.reason}`).join('; ')
+                  ? [...new Set(restrictions[col].map(r => r.reason))].join('; ')
                   : restrictions[col];
-                td.textContent = `<PROTECTED> ${reasons}`;
-                td.classList.add('restricted-cell');
+
+                let prefix = '';
+                if (reasons.includes('controlled')) {
+                  prefix = '🔐 ';
+                  td.classList.add('controlled-access-cell');
+                } else if (reasons.includes('registered')) {
+                  prefix = '👤 ';
+                  td.classList.add('registered-access-cell');
+                } else {
+                  td.classList.add('controlled-access-cell');
+                }
+                
+                td.textContent = `${prefix} ${reasons}`;
               } else {
                 td.textContent = '';
               }
@@ -234,38 +258,22 @@ SELECT * FROM person LIMIT 10;
 
       } catch (err) {
         responsePre.textContent = 'Error: ' + err.message;
-        sourcesDiv.innerHTML = '';
       }
     }
-    function copyTableToClipboard() {
-      const table = document.querySelector('#table-container table');
-      const copyStatus = document.getElementById('copy-status');
-      if (!table) {
-        copyStatus.textContent = 'No table to copy.';
-        return;
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const modal = document.getElementById('disclaimer-modal');
+      const acceptButton = document.getElementById('accept-disclaimer');
+
+      if (!sessionStorage.getItem('disclaimerAccepted')) {
+        modal.style.display = 'flex';
       }
 
-      let csv = [];
-      const rows = table.querySelectorAll('tr');
-      for (let row of rows) {
-        const cols = row.querySelectorAll('th, td');
-        let rowData = [];
-        for (let col of cols) {
-          let text = col.textContent.replace(/"/g, '""'); // Escape quotes
-          rowData.push(`"${text}"`);
-        }
-        csv.push(rowData.join(','));
-      }
-
-      const csvText = csv.join('\n');
-      navigator.clipboard.writeText(csvText).then(() => {
-        copyStatus.textContent = 'Copied!';
-        setTimeout(() => (copyStatus.textContent = ''), 2000);
-      }).catch(err => {
-        copyStatus.textContent = 'Copy failed.';
-        console.error('Failed to copy table:', err);
+      acceptButton.addEventListener('click', function() {
+        modal.style.display = 'none';
+        sessionStorage.setItem('disclaimerAccepted', 'true');
       });
-    }
+    });
   </script>
 </body>
 </html>
