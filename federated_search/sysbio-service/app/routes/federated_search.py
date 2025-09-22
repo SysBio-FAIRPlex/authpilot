@@ -86,12 +86,12 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
     if auth_header:
         headers["Authorization"] = auth_header
 
-    pd_access_tier = params.get("pd_access_tier", "public")
+    pdrd_access_tier = params.get("pdrd_access_tier", "public")
     ad_access_tier = params.get("ad_access_tier", "public")
 
     pd_request_payload = {
         "query": request.query,
-        "parameters": {"access_tier": pd_access_tier}
+        "parameters": {"access_tier": pdrd_access_tier}
     }
     ad_request_payload = {
         "query": request.query,
@@ -126,7 +126,7 @@ async def run_query(fastapi_request: Request, request: SearchRequest, db: Sessio
     restricted_fields = {}
     if pd_restricted:
         for field, reason in pd_restricted.items():
-            restricted_fields.setdefault(field.lower(), []).append({"source": "pd", "reason": reason})
+            restricted_fields.setdefault(field.lower(), []).append({"source": "pdrd", "reason": reason})
     if ad_restricted:
         for field, reason in ad_restricted.items():
             restricted_fields.setdefault(field.lower(), []).append({"source": "ad", "reason": reason})

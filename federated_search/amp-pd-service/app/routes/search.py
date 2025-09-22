@@ -59,7 +59,7 @@ def run_query(request: SearchRequest, db: Session = Depends(get_db), authorizati
         row_dict = dict(row._mapping)
         for field in restricted_fields:
             row_dict.pop(field, None)
-        row_dict["source"] = "AMP PD"
+        row_dict["source"] = "AMP PDRD"
         data.append(row_dict)
 
     # Build data_model from filtered data

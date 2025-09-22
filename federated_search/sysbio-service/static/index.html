@@ -45,8 +45,8 @@
             </select>
           </div>
           <div>
-            <label for="pd-tier">AMP PD Access Tier:</label>
-            <select id="pd-tier">
+            <label for="pdrd-tier">AMP PDRD Access Tier:</label>
+            <select id="pdrd-tier">
               <option value="public">Public</option>
               <option value="registered">Registered</option>
               <option value="controlled">Controlled</option>
@@ -124,7 +124,7 @@ SELECT * FROM person LIMIT 1;
             <pre class="json-output">${JSON.stringify(truncatedJson, null, 2)}</pre>
           `;
           accessToken = json.access_token;
-          document.getElementById('pd-tier').disabled = false;
+          document.getElementById('pdrd-tier').disabled = false;
           document.getElementById('ad-tier').disabled = false;
 
           // Fetch userinfo
@@ -151,7 +151,7 @@ SELECT * FROM person LIMIT 1;
             <pre class="json-output">${JSON.stringify({ user: "Not logged in" }, null, 2)}</pre>
           `;
           userinfoDiv.innerHTML = "";
-          document.getElementById('pd-tier').disabled = true;
+          document.getElementById('pdrd-tier').disabled = true;
           document.getElementById('ad-tier').disabled = true;
         }
       } catch (err) {
@@ -165,7 +165,7 @@ SELECT * FROM person LIMIT 1;
       const data = {
         query: document.getElementById('sql').value,
         parameters: {
-          pd_access_tier: document.getElementById('pd-tier').value,
+          pdrd_access_tier: document.getElementById('pdrd-tier').value,
           ad_access_tier: document.getElementById('ad-tier').value
         }
       };
