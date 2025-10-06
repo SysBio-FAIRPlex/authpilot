@@ -14,7 +14,7 @@ The next phase of the SysBio project calls for a transition of this code from a 
 
 ### Authentication interface
 - `auth-service` is tightly coupled to `sysbio-service` through a shared, symmetric `JWT_SECRET`.
-- Decouple `sysbio-service` from `auth-service` by implementing a "no-auth" mode.
+- Decouple `sysbio-service` from `auth-service` by implementing a "no-auth" mode with an optional, injectable authentication dependency, which we'll develop with Technome.
 - Work with Technome to develop an injectable interface that they can develop against. Figure out details of the final authentication setup with them to get this part of `sysbio-service` closer to the end vision.
 - We shouldn't necessarily throw away `auth-service`. It may be useful for end-to-end testing. But it will probably need to be refactored.
 
