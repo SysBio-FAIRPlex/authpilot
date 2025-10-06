@@ -8,7 +8,7 @@ The next phase of the SysBio project calls for a transition of this code from a 
 - Centralize configuration instead of reading environment variables directly
 
 ### Performance & Scaling
-- Identify current and future scale of data size (given existing AMPs, trends we expect to see for future datasets, and future-proofing)
+- Identify current and future scale of data size (given existing AMPs, trends we expect to see for future datasets, etc.)
 - Identify user interaction patterns that are relevant to scaling concerns 
 	- e.g. "we think a user is likely to try to grab all data that they can access; how should we handle it if that results in a huge payload?"
 - How does the top-level `sysbio-service` handle performance issues from its downstream AMP services?
