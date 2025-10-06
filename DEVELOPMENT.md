@@ -3,10 +3,9 @@ The next phase of the SysBio project calls for a transition of this code from a 
 
 ## Year 2 high-level development needs
 
-### Package hygiene
+### Packaging
 - Modernize Python packaging (e.g. use `pyproject.toml` instead of requirements.txt)
 - Centralize configuration instead of reading environment variables directly
-- Formalize a versioning strategy (and expose it to API consumers through a /version endpoint)
 
 ### Persistence hardening
 - The system currently uses SQLite files to store session data. 
@@ -27,7 +26,7 @@ The next phase of the SysBio project calls for a transition of this code from a 
 - We have unit tests, but they are out of date and need to be refactored and incorporated into CI/CD
 - We should establish a plan for testing the contract between `sysbio-service` and downstream AMP services. 
 	- Automated contract testing frameworks like Pact are *potentially* a good fit here, but the tradeoffs should be considered carefully. It could be a huge distraction.
-- Regardless of contract testing strategy, we should have a versioned API spec that is easy to ingest by API consumers.
+- Regardless of contract testing strategy, we should formalize our versioning strategy and expose it to API consumers through a /version endpoint.
 
 ### Deployment, CI/CD, developer experience
 - Develop a packaging and deployment plan, both for developer use and deployment into our environments.
