@@ -6,7 +6,7 @@ The next phase of the SysBio project calls for a transition of this code from a 
 ### Package hygiene
 - Modernize Python packaging (e.g. use `pyproject.toml` instead of requirements.txt)
 - Centralize configuration instead of reading environment variables directly
-- Formalize a versioning schema (and expose it to API consumers through a /version endpoint)
+- Formalize a versioning strategy (and expose it to API consumers through a /version endpoint)
 
 ### Persistence hardening
 - The system currently uses SQLite files to store session data. 
