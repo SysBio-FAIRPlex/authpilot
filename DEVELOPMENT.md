@@ -4,8 +4,8 @@ The next phase of the SysBio project calls for a transition of this code from a 
 ## Year 2 high-level development needs
 
 ### Package hygiene
+- Modernize Python packaging (e.g. use `pyproject.toml` instead of requirements.txt)
 - Centralize configuration instead of reading environment variables directly
-- Modernize Python packaging (use `pyproject.toml` instead of requirements.txt)
 - Formalize a versioning schema (and expose it to API consumers through a /version endpoint)
 
 ### Persistence hardening
@@ -32,4 +32,4 @@ The next phase of the SysBio project calls for a transition of this code from a 
 ### Deployment, CI/CD, developer experience
 - Develop a packaging and deployment plan, both for developer use and deployment into our environments.
 - Develop an environment strategy: how many environments do we have, what are they for, and how do new versions progress through them?
-- Write a contributor's guide.
+- Set up formatters and linters, write a contributor's guide, etc.
