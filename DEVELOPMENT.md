@@ -27,7 +27,7 @@ The next phase of the SysBio project calls for a transition of this code from a 
 - We have unit tests, but they are out of date and need to be refactored and incorporated into CI/CD
 - We should establish a plan for testing the contract between `sysbio-service` and downstream AMP services. 
 	- Automated contract testing frameworks like Pact are *potentially* a good fit here, but the tradeoffs should be considered carefully. It could be a huge distraction.
-- Regardless of contract testing strategy, we should have a versioned API spec that is easy to ingest by downstream services.
+- Regardless of contract testing strategy, we should have a versioned API spec that is easy to ingest by API consumers.
 
 ### Deployment, CI/CD, developer experience
 - Develop a packaging and deployment plan, both for developer use and deployment into our environments.
