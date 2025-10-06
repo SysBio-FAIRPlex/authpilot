@@ -7,6 +7,12 @@ The next phase of the SysBio project calls for a transition of this code from a 
 - Modernize Python packaging (e.g. use `pyproject.toml` instead of requirements.txt)
 - Centralize configuration instead of reading environment variables directly
 
+### Performance & Scaling
+- Identify current and future scale of data size (given existing AMPs, trends we expect to see for future datasets, and future-proofing)
+- Identify user interaction patterns that are relevant to scaling concerns 
+	- e.g. "we think a user is likely to try to grab all data that they can access; how should we handle it if that results in a huge payload?"
+- How does the top-level `sysbio-service` handle performance issues from its downstream AMP services?
+
 ### Persistence hardening
 - The system currently uses SQLite files to store session data. 
 - Recommendation: Migrate to something like Postgres instead. Develop a deployment and backup strategy (probably a managed Cloud SQL deployment makes the most sense to achieve both of those goals). 
