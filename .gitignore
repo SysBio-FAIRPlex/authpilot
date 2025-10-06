@@ -33,3 +33,4 @@ certs/
 
 # Secrets
 private_key.pem
+.aider*
